@@ -1,0 +1,40 @@
+[project]
+name = "obsidiyan"
+version = "0.1.0"
+description = "Shared, sourced memory for AI coding agents: corpus, search, MCP server and a verified distillation pipeline."
+requires-python = ">=3.12"
+dependencies = ["pydantic>=2.9", "pyyaml>=6"]
+
+# mcp braucht nur der Server in obsidiyan/mcp_server.py, nicht der Corpus-Layer.
+# dev ist genau das, was ein frisches Worktree fuer pytest, ruff und mypy braucht.
+[project.optional-dependencies]
+mcp = ["mcp>=2"]
+dev = ["obsidiyan[mcp]", "pytest>=8", "ruff>=0.6", "mypy>=1.11", "types-PyYAML"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["obsidiyan*"]
+
+[tool.setuptools.package-data]
+obsidiyan = ["demo/*.jsonl"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["tests"]

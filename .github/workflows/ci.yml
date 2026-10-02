@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+      - run: uv venv --python 3.12 && uv pip install -e ".[dev]"
+      - run: .venv/bin/ruff check .
+      - run: .venv/bin/mypy obsidiyan
+      - run: .venv/bin/pytest -q
+      - name: classifier eval
+        run: .venv/bin/python scripts/eval-nda.py --strict
+      - name: end-to-end demo
+        run: |
+          .venv/bin/python -m obsidiyan init /tmp/vault --demo
+          OBSIDIYAN_HOME=/tmp/vault .venv/bin/python -m obsidiyan search Postgres
+          OBSIDIYAN_HOME=/tmp/vault .venv/bin/python scripts/verify-graph.py
+          OBSIDIYAN_HOME=/tmp/vault .venv/bin/python scripts/verify-nda.py
+          OBSIDIYAN_HOME=/tmp/vault .venv/bin/python scripts/verify-mcp.py
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: secret scan (full history)
+        run: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --no-banner --redact

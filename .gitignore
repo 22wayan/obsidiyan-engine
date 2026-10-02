@@ -1,0 +1,36 @@
+# Oeffentliche Engine. Inhalte eines Vaults gehoeren nie hierher:
+# keine Notes, keine Claims, keine Chats, kein Corpus. Der eigene Vault
+# liegt getrennt und wird ueber OBSIDIYAN_HOME angebunden.
+/notes/
+/memory/
+/private/
+/distill/
+/chats/
+/books/
+/courses/
+/corpus/
+/loop/
+/BRAIN.md
+/mcp-instructions.md
+nda-source-overrides.json
+
+# Zweiter Riegel fuer die Beispiel-Deny-Liste in obsidiyan/nda.py.
+/memory/*[Aa][Cc][Mm][Ee]*/
+/memory/*[Gg][Ll][Oo][Bb][Ee][Xx]*/
+/memory/*[Ii][Nn][Tt][Ee][Rr][Vv][Ii][Ee][Ww][Kk][Ii][Tt]*/
+/memory/*[Tt][Ee][Aa][Mm][Cc][Oo]-[Ww][Ee][Bb][Ss][Ii][Tt][Ee]*/
+/memory/*[Ii][Nn][Ii]-[Tt][Ee][Cc][Hh]*/
+/memory/*[Uu][Mm][Bb][Rr][Ee][Ll][Ll][Aa]-[Ee][Nn][Ee][Rr][Gg][Ii][Ee]*/
+/memory/*[Hh][Oo][Oo][Ll][Ii]-[Mm][Aa][Gg]*/
+
+# Abgeleitete Artefakte
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store

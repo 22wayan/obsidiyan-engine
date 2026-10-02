@@ -1,0 +1,43 @@
+{"id": "term-01", "category": "known name", "expected": "nda", "project": "shop", "text": "Meeting with Acme tomorrow about the CRM export."}
+{"id": "term-02", "category": "known name", "expected": "nda", "project": "shop", "text": "ACME wants the dashboard by Friday."}
+{"id": "term-03", "category": "known name", "expected": "nda", "project": "notes", "text": "Globex sent their price list, we compare it next week."}
+{"id": "term-04", "category": "known name", "expected": "nda", "project": "notes", "text": "The Docparse pipeline failed on scanned PDFs again."}
+{"id": "term-05", "category": "known name", "expected": "nda", "project": "web", "text": "Draft the hero section for the ini.tech website."}
+{"id": "term-06", "category": "known name", "expected": "nda", "project": "web", "text": "Umbrella Energie asked for a second offer."}
+{"id": "term-07", "category": "known name", "expected": "nda", "project": "web", "text": "Relaunch plan for hooli-mag: three templates."}
+{"id": "term-08", "category": "known name", "expected": "nda", "project": "agents", "text": "Storybot should write the acceptance criteria in German."}
+{"id": "slug-01", "category": "known project folder", "expected": "nda", "project": "acme-poc", "text": "Refactor the parser into two modules."}
+{"id": "slug-02", "category": "known project folder", "expected": "nda", "project": "CRM-globex", "text": "Add a scoring column to the export."}
+{"id": "slug-03", "category": "known project folder", "expected": "nda", "project": "Teamco-Website", "text": "Fix the footer spacing on mobile."}
+{"id": "slug-04", "category": "known project folder", "expected": "nda", "project": "ini-tech", "text": "Update the contact form copy."}
+{"id": "slug-05", "category": "known project folder", "expected": "nda", "project": "final-pr-acme", "text": "Prepare the slides for the final review."}
+{"id": "mail-01", "category": "e-mail address", "expected": "nda", "project": "notes", "text": "Send the draft to jane.doe@example.com."}
+{"id": "mail-02", "category": "e-mail address", "expected": "nda", "project": "notes", "text": "Kontakt: max.mustermann@firma.de"}
+{"id": "mail-03", "category": "e-mail address", "expected": "nda", "project": "ops", "text": "CC ops-team@corp.io on the incident report."}
+{"id": "mail-04", "category": "e-mail address", "expected": "nda", "project": "ops", "text": "Reply to <a.b+news@mail.example.org>."}
+{"id": "secret-01", "category": "secret", "expected": "nda", "project": "ops", "text": "export ANTHROPIC_API_KEY={ANTHROPIC}"}
+{"id": "secret-02", "category": "secret", "expected": "nda", "project": "ops", "text": "OPENAI_API_KEY={OPENAI} in the old .env"}
+{"id": "secret-03", "category": "secret", "expected": "nda", "project": "ops", "text": "The token {GITHUB} expired yesterday."}
+{"id": "secret-04", "category": "secret", "expected": "nda", "project": "ops", "text": "aws_access_key_id = {AWS}"}
+{"id": "secret-05", "category": "secret", "expected": "nda", "project": "ops", "text": "const key = '{GOOGLE}';"}
+{"id": "secret-06", "category": "secret", "expected": "nda", "project": "ops", "text": "{PRIVATE_KEY}\nMIIEvQIBADANBg..."}
+{"id": "unknown-01", "category": "confidential, no known name", "expected": "nda", "project": "notes", "text": "Our client's Q3 revenue dropped 12 percent, keep this internal."}
+{"id": "unknown-02", "category": "confidential, no known name", "expected": "nda", "project": "notes", "text": "Under NDA: the supplier quoted 41 euros per unit for the new contract."}
+{"id": "unknown-03", "category": "confidential, no known name", "expected": "nda", "project": "notes", "text": "The customer's churn list has 380 accounts, do not share it."}
+{"id": "unknown-04", "category": "confidential, no known name", "expected": "nda", "project": "health", "text": "Doctor said the blood values look better, next check in June."}
+{"id": "neg-01", "category": "hard negative", "expected": "clean", "project": "shop", "text": "Acmeware is a fictional library name in the docs."}
+{"id": "neg-02", "category": "hard negative", "expected": "clean", "project": "shop", "text": "Rename globexample to globalExample."}
+{"id": "neg-03", "category": "hard negative", "expected": "clean", "project": "engine", "text": "The graph invariants must hold after every write."}
+{"id": "neg-04", "category": "hard negative", "expected": "clean", "project": "java", "text": "Add @Override to the toString method."}
+{"id": "neg-05", "category": "hard negative", "expected": "clean", "project": "ops", "text": "Connect as postgres@localhost on port 5432."}
+{"id": "neg-06", "category": "hard negative", "expected": "clean", "project": "ops", "text": "Run the task-runner-configuration-check before the deploy."}
+{"id": "neg-07", "category": "hard negative", "expected": "clean", "project": "web", "text": "Export the logo as logo@2x.png for retina screens."}
+{"id": "neg-08", "category": "hard negative", "expected": "clean", "project": "ml", "text": "pip install scikit-learn, then fit the risk-score model."}
+{"id": "neg-09", "category": "hard negative", "expected": "clean", "project": "ops", "text": "Set ANTHROPIC_API_KEY as an environment variable, never in code."}
+{"id": "neg-10", "category": "hard negative", "expected": "clean", "project": "git", "text": "git checkout -b fix/umbrella-icon"}
+{"id": "clean-01", "category": "ordinary", "expected": "clean", "project": "shop", "text": "We go with Postgres because checkout needs one transaction."}
+{"id": "clean-02", "category": "ordinary", "expected": "clean", "project": "shop", "text": "Use Alembic for migrations so every schema change is reviewed."}
+{"id": "clean-03", "category": "ordinary", "expected": "clean", "project": "web", "text": "Tailwind classes instead of CSS modules for the new card component."}
+{"id": "clean-04", "category": "ordinary", "expected": "clean", "project": "ml", "text": "The baseline reaches 0.81 F1, the tuned model 0.86."}
+{"id": "clean-05", "category": "ordinary", "expected": "clean", "project": "ops", "text": "Deploy to Fly.io with two machines in Frankfurt."}
+{"id": "clean-06", "category": "ordinary", "expected": "clean", "project": "notes", "text": "Read the FSRS paper before changing the scheduler."}
