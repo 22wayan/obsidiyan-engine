@@ -28,6 +28,10 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# Fiktive Session-Texte fuer den Eval, lange Zeilen sind dort Daten.
+"evals/agent/build_history.py" = ["E501"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true

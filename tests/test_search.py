@@ -185,7 +185,9 @@ def test_fallback_matches_ripgrep_simple_case_folding(tmp_path: Path) -> None:
         ),
         tmp_path,
     )
-    assert search("straße Tempo", tmp_path, today=TODAY) == []
+    # Nur ein Teil-Treffer ueber "Tempo": "straße" darf nicht als "strasse" zaehlen.
+    partial = search("straße Tempo", tmp_path, today=TODAY)
+    assert all(h.matched_terms < h.total_terms for h in partial)
     hits = search("strasse Tempo", tmp_path, today=TODAY)
     assert [h.doc.conv_id for h in hits] == ["strasse"]
 
@@ -259,3 +261,45 @@ def test_leading_dash_term_is_literal_on_ripgrep_path(
 
     hits = search("--include-nda", corpus, today=TODAY)
     assert [h.doc.conv_id for h in hits] == ["flag-doc"]
+
+
+def test_title_counts_as_searchable_text(tmp_path: Path) -> None:
+    """Session titles often name the topic the turns never repeat."""
+    write_doc(
+        make_doc(
+            conv_id="t",
+            title="Public API rate limit",
+            turns=(Turn(role=Role.USER, text="We allow 60 requests per minute per key."),),
+        ),
+        tmp_path,
+    )
+    hits = search("rate limit", tmp_path, today=TODAY)
+    assert [h.doc.conv_id for h in hits] == ["t"]
+    assert hits[0].snippet
+
+
+def test_falls_back_to_partial_matches_when_no_doc_has_every_term(tmp_path: Path) -> None:
+    """Agents type natural phrases; one extra word must not wipe out every result."""
+    write_doc(
+        make_doc(
+            conv_id="money",
+            turns=(Turn(role=Role.USER, text="Store all money as integer cents."),),
+        ),
+        tmp_path,
+    )
+    write_doc(
+        make_doc(conv_id="other", turns=(Turn(role=Role.USER, text="Deploy to Fly.io."),)),
+        tmp_path,
+    )
+    hits = search("store money amounts", tmp_path, today=TODAY)
+    assert [h.doc.conv_id for h in hits] == ["money"]
+    assert (hits[0].matched_terms, hits[0].total_terms) == (2, 3)
+
+
+def test_full_matches_report_every_term(tmp_path: Path) -> None:
+    write_doc(
+        make_doc(conv_id="m", turns=(Turn(role=Role.USER, text="money in cents"),)),
+        tmp_path,
+    )
+    hits = search("money cents", tmp_path, today=TODAY)
+    assert (hits[0].matched_terms, hits[0].total_terms) == (2, 2)

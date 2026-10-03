@@ -80,7 +80,8 @@ def _corpus_root() -> Path:
         "Search the knowledge base. Returns the best hits with date, source, snippet "
         "and doc_id. All terms must occur in a document (substring, case-insensitive, "
         "any order); put an exact phrase in double quotes. Use two to four distinctive "
-        "keywords, not full sentences; with zero hits drop a term or try a synonym. "
+        "keywords, not full sentences. If no document contains every term, the best partial "
+        "matches come back with matched_terms below the total; then try other words. "
         "Call get_doc for the full text."
     )
 )
@@ -111,6 +112,7 @@ def search(
             "sensitivity": hit.doc.sensitivity.value,
             "snippet": hit.snippet,
             "score": round(hit.score, 3),
+            "matched_terms": f"{hit.matched_terms}/{hit.total_terms}",
         }
         for hit in hits
     ]

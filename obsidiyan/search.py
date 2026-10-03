@@ -29,6 +29,7 @@ from obsidiyan.models import Doc, Role, Sensitivity
 _USER_WEIGHT = 2.0
 _MACHINE_SUMMARY_WEIGHT = 1.5  # protokolliert Nutzer-Entscheidungen, aber nicht woertlich
 _ASSISTANT_WEIGHT = 1.0
+_TITLE_WEIGHT = 2.0  # Session-Titel benennen oft das Thema, das die Turns nicht wiederholen
 _RECENCY_HALFLIFE_DAYS = 120.0
 
 
@@ -38,6 +39,8 @@ class Hit:
     doc: Doc
     score: float
     snippet: str
+    matched_terms: int = 0
+    total_terms: int = 0
 
     def render(self) -> str:
         day = self.doc.started_at.date().isoformat() if self.doc.started_at else "????-??-??"
@@ -45,6 +48,8 @@ class Hit:
         flag = "" if level is Sensitivity.CLEAN else f" [{level.value.upper()}]"
         title = self.doc.title or self.doc.project or self.doc.conv_id[:12]
         head = f"{day}  {self.doc.source.value:12} {title[:52]:52}{flag}"
+        if self.matched_terms < self.total_terms:
+            head += f"  (matches {self.matched_terms} of {self.total_terms} terms)"
         return f"{head}\n    {self.snippet}\n    {self.path}"
 
 
@@ -129,6 +134,22 @@ def _candidate_files(terms: list[str], corpus_root: Path) -> list[Path]:
     return candidates
 
 
+def _any_term_files(terms: list[str], corpus_root: Path) -> list[Path]:
+    """Dateien, die mindestens einen Term enthalten. Nur fuer den Teil-Treffer-Fallback."""
+    needles = [term.lower() for term in terms]
+    found: list[Path] = []
+    for path in corpus_root.rglob("*.md"):
+        text = path.read_text(encoding="utf-8", errors="replace").lower()
+        if any(needle in text for needle in needles):
+            found.append(path)
+    return found
+
+
+def _matched_terms(doc: Doc, terms: list[str]) -> int:
+    text = " ".join([doc.title or "", *(turn.text for turn in doc.turns)]).lower()
+    return sum(term.lower() in text for term in terms)
+
+
 def _recency(doc: Doc, today: date) -> float:
     if doc.started_at is None:
         return 0.5
@@ -150,7 +171,7 @@ def _window(text: str, start: int, end: int, before: int = 60, after: int = 90) 
 
 
 def _score(doc: Doc, pattern: re.Pattern[str], today: date) -> tuple[float, str]:
-    total = 0.0
+    total = _TITLE_WEIGHT * len(pattern.findall(doc.title or ""))
     snippet = ""
     for turn in doc.turns:
         matches = pattern.findall(turn.text)
@@ -167,7 +188,7 @@ def _score(doc: Doc, pattern: re.Pattern[str], today: date) -> tuple[float, str]
             hit = pattern.search(turn.text)
             if hit:
                 snippet = _window(turn.text, hit.start(), hit.end())
-    return total * _recency(doc, today), snippet
+    return total * _recency(doc, today), snippet or (doc.title or "")
 
 
 def search(
@@ -189,7 +210,15 @@ def search(
     now = today or datetime.now().date()
     hits: list[Hit] = []
 
-    for path in _candidate_files(terms, corpus_root):
+    # Agents tippen oft natuerliche Wendungen. Hat kein Dokument alle Terme,
+    # liefert die Suche die besten Teil-Treffer statt einer leeren Liste und
+    # markiert sie; vorher gab der Agent bei null Treffern einfach auf.
+    candidates = _candidate_files(terms, corpus_root)
+    partial = not candidates and len(terms) > 1
+    if partial:
+        candidates = _any_term_files(terms, corpus_root)
+
+    for path in candidates:
         try:
             doc = read_doc(path)
         except (ValueError, KeyError):
@@ -204,7 +233,8 @@ def search(
             continue
         score, snippet = _score(doc, pattern, now)
         if score > 0:
-            hits.append(Hit(path=path, doc=doc, score=score, snippet=snippet))
+            matched = _matched_terms(doc, terms) if partial else len(terms)
+            hits.append(Hit(path, doc, score, snippet, matched, len(terms)))
 
-    hits.sort(key=lambda h: h.score, reverse=True)
+    hits.sort(key=lambda h: (h.matched_terms, h.score), reverse=True)
     return hits[:limit]
