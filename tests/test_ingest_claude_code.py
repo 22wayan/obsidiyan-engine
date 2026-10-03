@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -347,3 +348,26 @@ def test_unresolvable_cwd_keeps_the_directory_slug(tmp_path: Path) -> None:
     doc = parse_session(path)
     assert doc is not None
     assert doc.project == project_slug(path)
+
+
+def test_ingest_never_writes_a_secret_into_the_corpus(tmp_path: Path) -> None:
+
+    fake = "an_" + "sk_" + "a1B2c3D4" * 4
+    project = tmp_path / "sessions" / "-Users-demo-shop"
+    project.mkdir(parents=True)
+    rows = [
+        {"type": "user", "sessionId": "s1", "timestamp": "2026-07-17T10:00:00+00:00",
+         "cwd": "/home/demo/shop", "message": {"role": "user",
+         "content": f"In der config steht API_KEY = \"{fake}\". Was tun?"}},
+        {"type": "assistant", "sessionId": "s1", "timestamp": "2026-07-17T10:00:05+00:00",
+         "message": {"role": "assistant", "content": [{"type": "text",
+         "text": f"Der Key {fake} liegt im Klartext, bitte rotieren."}]}},
+    ]
+    (project / "s1.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), "utf-8")
+    corpus = tmp_path / "corpus"
+    ingest.run("claude-code", corpus, session_root=tmp_path / "sessions",
+               source_overrides_path=tmp_path / "none.json", require_source_overrides=False)
+    written = "".join(p.read_text("utf-8") for p in corpus.rglob("*.md"))
+    assert "Was tun?" in written
+    assert fake not in written
+    assert "sensitivity: nda" in written

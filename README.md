@@ -155,19 +155,21 @@ Reproduce: `python evals/agent/build_history.py --realistic && python evals/agen
 
 ## How well the classifier works
 
-`scripts/eval-nda.py` runs the classifier against 43 labelled cases in `evals/nda_cases.jsonl`: known client names and project folders, e-mail addresses, six kinds of secrets, ordinary developer talk and ten hard negatives such as `Acmeware`, `postgres@localhost` or `logo@2x.png`.
+`scripts/eval-nda.py` runs the classifier against 48 labelled cases in `evals/nda_cases.jsonl`: known client names and project folders, e-mail addresses, nine kinds of secrets, ordinary developer talk and twelve hard negatives such as `Acmeware`, `postgres@localhost`, `logo@2x.png` or `process.env.ANTHROPIC_API_KEY`.
 
 | Metric | Result |
 |---|---|
-| Recall on confidential cases | 0.85 (23 of 27) |
+| Recall on confidential cases | 0.87 (26 of 30) |
 | Precision | 1.00 (no clean case flagged) |
-| Known names, project folders, e-mails, secrets | 23 of 23 |
-| Hard negatives | 10 of 10 |
+| Known names, project folders, e-mails, secrets | 26 of 26 |
+| Hard negatives | 12 of 12 |
 | Confidential text without any known name | 0 of 4 |
 
 The last row is the honest limit of a rule-based classifier: "our client's Q3 revenue dropped" contains nothing it can match. Such conversations are marked by hand in `private/nda-source-overrides.json`. The eval runs in CI and fails if recall drops below 0.85 or precision below 0.95.
 
 Writing the eval found two false positives, both fixed: `task-runner-...` contains `sk-` and looked like an API key, and `logo@2x.png` looked like an e-mail address.
+
+Detected secrets are also removed from the text at ingest, not only classified: the corpus stores `[secret removed]` instead of the key. A key format the classifier did not know (`API_KEY = an_sk_...`) once sat in plain text in a corpus document and surfaced in a search; generic assignments of a long value to a key name are now caught as well.
 
 ## Design decisions
 
@@ -234,7 +236,7 @@ chats/              provider exports you put there, never committed
 ## Development
 
 ```bash
-scripts/check.sh          # ruff, mypy --strict, pytest (274 tests)
+scripts/check.sh          # ruff, mypy --strict, pytest (279 tests)
 .venv/bin/python scripts/eval-nda.py   # classifier eval
 .venv/bin/python scripts/eval-search.py   # retrieval eval, no model needed
 vhs docs/demo.tape                     # re-record the README demo

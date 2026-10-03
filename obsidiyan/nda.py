@@ -74,9 +74,19 @@ SECRET_RE = re.compile(
     r"gh[pousr]_[A-Za-z0-9]{20,}|"
     r"AKIA[0-9A-Z]{16}|"
     r"AIza[0-9A-Za-z_-]{35}|"
-    r"-----BEGIN [A-Z ]*PRIVATE KEY-----"
+    r"an_sk_[A-Za-z0-9_-]{20,}|"
+    r"sk_(?:live|test)_[A-Za-z0-9]{16,}|"
+    r"xox[abpr]-[A-Za-z0-9-]{10,}|"
+    r"glpat-[A-Za-z0-9_-]{20,}|"
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----|"
+    # Zuweisung an einen Key-Namen mit langem Wert aus Buchstaben UND Ziffern.
+    # Die Ziffern-Bedingung laesst Verweise wie process.env.ANTHROPIC_API_KEY
+    # durch; ein unbekanntes Key-Format faellt trotzdem auf.
+    r"(?i:[A-Z0-9_]*(?:API_?KEY|SECRET|TOKEN|PASSWORD|PASSWD))\b[\"']?\s*[=:]\s*[\"']?"
+    r"(?=[A-Za-z0-9_\-./+]*\d)(?=[A-Za-z0-9_\-./+]*[A-Za-z])[A-Za-z0-9_\-./+]{24,}"
     r")"
 )
+REDACTED = "[secret removed]"
 _SLUG_RES = tuple(re.compile(re.escape(s), re.IGNORECASE) for s in DENY_SLUGS)
 
 
@@ -98,6 +108,15 @@ def text_has_email(text: str) -> bool:
 def text_has_secret(text: str) -> bool:
     """Konservative Erkennung gaengiger echter Token- und Key-Formate."""
     return SECRET_RE.search(text) is not None
+
+
+def redact_secrets(text: str) -> str:
+    """Ersetzt erkannte Keys und Tokens, bevor Text in den Corpus geschrieben wird.
+
+    Die Einstufung als NDA allein reicht nicht: eine Suche mit include_nda
+    liefert den Text sonst samt Key an den Agent.
+    """
+    return SECRET_RE.sub(REDACTED, text)
 
 
 def classify(project: str, text: str) -> Sensitivity:
