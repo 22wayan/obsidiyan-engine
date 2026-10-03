@@ -41,3 +41,8 @@
 {"id": "clean-04", "category": "ordinary", "expected": "clean", "project": "ml", "text": "The baseline reaches 0.81 F1, the tuned model 0.86."}
 {"id": "clean-05", "category": "ordinary", "expected": "clean", "project": "ops", "text": "Deploy to Fly.io with two machines in Frankfurt."}
 {"id": "clean-06", "category": "ordinary", "expected": "clean", "project": "notes", "text": "Read the FSRS paper before changing the scheduler."}
+{"id": "secret-07", "category": "secret", "expected": "nda", "project": "ops", "text": "config.toml holds API_KEY = \"{KEY_21ST}\" in plain text."}
+{"id": "secret-08", "category": "secret", "expected": "nda", "project": "ops", "text": "The billing job still uses {STRIPE_LIVE}."}
+{"id": "secret-09", "category": "secret", "expected": "nda", "project": "ops", "text": "MAGIC_API_KEY={GENERIC}"}
+{"id": "neg-11", "category": "hard negative", "expected": "clean", "project": "web", "text": "const key = process.env.ANTHROPIC_API_KEY; never hardcode it."}
+{"id": "neg-12", "category": "hard negative", "expected": "clean", "project": "ops", "text": "TOKEN_EXPIRY_SECONDS = 3600 is fine for magic links."}

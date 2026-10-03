@@ -19,6 +19,7 @@ from obsidiyan.nda import (
     DEFAULT_SOURCE_OVERRIDES,
     load_source_overrides,
     policy_signature,
+    redact_secrets,
     source_is_denied,
 )
 from obsidiyan.sources import archives, claude_code, codex, courses, local_notes
@@ -135,6 +136,12 @@ def _remove_stale_docs(corpus_root: Path, source: Source, expected: set[Path]) -
     return removed
 
 
+def _without_secrets(doc: Doc) -> Doc:
+    """Keys und Tokens verlassen die Rohquelle nie Richtung Corpus."""
+    turns = tuple(turn.model_copy(update={"text": redact_secrets(turn.text)}) for turn in doc.turns)
+    return doc.model_copy(update={"title": redact_secrets(doc.title or ""), "turns": turns})
+
+
 def run(
     source: str,
     corpus_root: Path,
@@ -213,7 +220,7 @@ def run(
             else:
                 stats = stats.bump(clean_docs=1)
             if not dry_run:
-                write_doc(doc, corpus_root)
+                write_doc(_without_secrets(doc), corpus_root)
             stats = stats.bump(written=1)
             wrote_any = True
 

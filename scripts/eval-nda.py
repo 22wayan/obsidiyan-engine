@@ -33,6 +33,9 @@ FAKE_SECRETS = {
     "{AWS}": "AK" + "IA" + "Z" * 16,
     "{GOOGLE}": "AI" + "za" + "x" * 35,
     "{PRIVATE_KEY}": "-----BEGIN RSA " + "PRIVATE KEY-----",
+    "{KEY_21ST}": "an_" + "sk_" + "a1B2c3D4" * 4,
+    "{STRIPE_LIVE}": "sk_" + "live_" + "Z9y8X7w6" * 3,
+    "{GENERIC}": "q7Lm2Xr9" + "Tb4Vn8Kc1Hp6Wd3Zs5",
 }
 
 # Untergrenzen fuer CI. Sinkt ein Wert, hat eine Aenderung den Klassifizierer

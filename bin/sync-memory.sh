@@ -86,7 +86,9 @@ file_is_denied() {
 
 file_has_secret() {
   local file="$1"
-  grep -Eiq '(sk-ant-[[:alnum:]_-]{20,}|sk-[[:alnum:]_-]{20,}|github_pat_[[:alnum:]_]{20,}|gh[pousr]_[[:alnum:]]{20,}|AKIA[0-9A-Z]{16}|AIza[[:alnum:]_-]{35}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' "$file"
+  # Spiegelt SECRET_RE in obsidiyan/nda.py. Die Zuweisungs-Regel ist hier
+  # grober (ERE kennt kein Lookahead): im Zweifel landet die Datei privat.
+  grep -Eiq '(sk-ant-[[:alnum:]_-]{20,}|sk-[[:alnum:]_-]{20,}|github_pat_[[:alnum:]_]{20,}|gh[pousr]_[[:alnum:]]{20,}|AKIA[0-9A-Z]{16}|AIza[[:alnum:]_-]{35}|an_sk_[[:alnum:]_-]{20,}|sk_(live|test)_[[:alnum:]]{16,}|xox[abpr]-[[:alnum:]-]{10,}|glpat-[[:alnum:]_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(api_?key|secret|token|password|passwd)["'"'"']?[[:space:]]*[=:][[:space:]]*["'"'"']?[[:alnum:]_./+-]{24,})' "$file"
 }
 
 unsafe_path() {

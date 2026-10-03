@@ -15,6 +15,7 @@ from obsidiyan.nda import (
     classify,
     load_source_overrides,
     policy_signature,
+    redact_secrets,
     source_is_denied,
     sync_memory_deny_list,
     sync_memory_deny_terms,
@@ -158,3 +159,35 @@ def test_sk_inside_a_word_is_not_a_secret() -> None:
 def test_retina_asset_names_are_not_email_addresses() -> None:
     assert not text_has_email("Export the logo as logo@2x.png for retina screens.")
     assert text_has_email("Send it to jane.doe@example.com")
+
+
+# Fake values are assembled at runtime so secret scanners do not flag the repo.
+FAKE_21ST = "an_" + "sk_" + "a1B2c3D4" * 4
+FAKE_STRIPE_LIVE = "sk_" + "live_" + "Z9y8X7w6" * 3
+FAKE_SLACK = "xox" + "b-" + "1234567890-" + "abcDEF" * 4
+
+
+def test_detects_more_key_formats() -> None:
+    assert text_has_secret(f"API_KEY = \"{FAKE_21ST}\"")
+    assert text_has_secret(f"stripe key {FAKE_STRIPE_LIVE}")
+    assert text_has_secret(f"bot token {FAKE_SLACK}")
+
+
+def test_detects_generic_key_assignments_with_long_values() -> None:
+    assert text_has_secret("MAGIC_API_KEY=" + "q7Lm2Xr9Tb4Vn8Kc1Hp6Wd3Zs5")
+    assert text_has_secret("password: " + "Tr0ub4dor-and-3-horses-staple")
+
+
+def test_ignores_key_names_without_a_secret_value() -> None:
+    assert not text_has_secret("API_KEY=process.env.ANTHROPIC_API_KEY")
+    assert not text_has_secret("Set OPENAI_API_KEY to the key from your dashboard.")
+    assert not text_has_secret("TOKEN_EXPIRY_SECONDS = 3600")
+
+
+def test_redact_secrets_removes_the_value_and_keeps_the_text() -> None:
+    text = f"In config.toml steht API_KEY = \"{FAKE_21ST}\", bitte rotieren."
+    redacted = redact_secrets(text)
+    assert FAKE_21ST not in redacted
+    assert "[secret removed]" in redacted
+    assert redacted.startswith("In config.toml steht")
+    assert redact_secrets("nothing to see") == "nothing to see"
