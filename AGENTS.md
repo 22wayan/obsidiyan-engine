@@ -47,6 +47,7 @@ Never point `OBSIDIYAN_HOME` at a real vault while testing.
 - **Provenance is mandatory.** A claim without `source_doc_id` must not reach a note. Do not add a path that writes notes without going through the claim store or `notewriter`.
 - **The graph has invariants.** Every note except `BRAIN.md` has exactly one `parent`. `scripts/verify-graph.py` must stay green.
 - **Confidential material never reaches the committed layer.** `notes/` and `memory/` are committed, `private/`, `corpus/` and `chats/` are not. `scripts/verify-nda.py` must stay green.
+- **Measure search changes.** Run `scripts/eval-search.py` before and after any change to `search.py`; for larger changes also `evals/agent/run_agent_eval.py`, and report the numbers, including misses.
 - **Measure classifier changes.** Run `scripts/eval-nda.py` before and after any change to `nda.py`, and add a labelled case to `evals/nda_cases.jsonl` for every bug you fix.
 - **Fail loudly.** A missing vault or corpus raises `VaultError`; it must not look like an empty result.
 - **No network calls** in the package. The only external process is the optional Claude Code CLI in `scripts/auto-distill.sh`.

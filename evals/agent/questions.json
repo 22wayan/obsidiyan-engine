@@ -1,0 +1,280 @@
+[
+ {
+  "id": "q01",
+  "category": "decision",
+  "question": "Which backend framework does Ledgerly use?",
+  "query": "framework",
+  "gold": [
+   "s01-stack"
+  ],
+  "must": [
+   [
+    "django"
+   ]
+  ]
+ },
+ {
+  "id": "q02",
+  "category": "convention",
+  "question": "How do we store money amounts in the database?",
+  "query": "money cents",
+  "gold": [
+   "s01-stack"
+  ],
+  "must": [
+   [
+    "cent"
+   ]
+  ]
+ },
+ {
+  "id": "q03",
+  "category": "superseded",
+  "question": "Which payment provider do we use for new customers today?",
+  "query": "payment provider",
+  "gold": [
+   "s14-mollie"
+  ],
+  "must": [
+   [
+    "mollie"
+   ]
+  ]
+ },
+ {
+  "id": "q04",
+  "category": "reason",
+  "question": "Why did we move away from Stripe?",
+  "query": "Stripe Mollie",
+  "gold": [
+   "s14-mollie"
+  ],
+  "must": [
+   [
+    "fee",
+    "percentage",
+    "cheaper"
+   ]
+  ]
+ },
+ {
+  "id": "q05",
+  "category": "convention",
+  "question": "What is the format of our invoice numbers?",
+  "query": "invoice number format",
+  "gold": [
+   "s03-numbers"
+  ],
+  "must": [
+   [
+    "ldg-"
+   ]
+  ]
+ },
+ {
+  "id": "q06",
+  "category": "reason",
+  "question": "Why must invoice numbers have no gaps?",
+  "query": "gapless",
+  "gold": [
+   "s03-numbers"
+  ],
+  "must": [
+   [
+    "gobd",
+    "tax"
+   ]
+  ]
+ },
+ {
+  "id": "q07",
+  "category": "reason",
+  "question": "Why do we render PDFs with WeasyPrint instead of Puppeteer?",
+  "query": "WeasyPrint Puppeteer",
+  "gold": [
+   "s04-pdf"
+  ],
+  "must": [
+   [
+    "512",
+    "memory",
+    "crash"
+   ]
+  ]
+ },
+ {
+  "id": "q08",
+  "category": "decision",
+  "question": "What database do our tests run against?",
+  "query": "tests testcontainers",
+  "gold": [
+   "s05-tests"
+  ],
+  "must": [
+   [
+    "testcontainers",
+    "real postgres"
+   ]
+  ]
+ },
+ {
+  "id": "q09",
+  "category": "bug",
+  "question": "What caused invoices to be dated one day too early, and how did we fix it?",
+  "query": "dated UTC",
+  "gold": [
+   "s06-timezone"
+  ],
+  "must": [
+   [
+    "utc"
+   ],
+   [
+    "europe/berlin",
+    "berlin",
+    "local date"
+   ]
+  ]
+ },
+ {
+  "id": "q10",
+  "category": "reason",
+  "question": "Why did we choose Postmark over SendGrid?",
+  "query": "Postmark SendGrid",
+  "gold": [
+   "s07-email"
+  ],
+  "must": [
+   [
+    "gmx",
+    "web.de",
+    "spam"
+   ]
+  ]
+ },
+ {
+  "id": "q11",
+  "category": "multi-session",
+  "question": "How can users log in to Ledgerly?",
+  "query": "log in",
+  "gold": [
+   "s08-auth",
+   "s18-passkeys"
+  ],
+  "must": [
+   [
+    "magic link"
+   ],
+   [
+    "passkey"
+   ]
+  ]
+ },
+ {
+  "id": "q12",
+  "category": "superseded",
+  "question": "Do we still use Unleash for feature flags? If not, what replaced it?",
+  "query": "Unleash",
+  "gold": [
+   "s13-flags-removed"
+  ],
+  "must": [
+   [
+    "environment variable",
+    "env var"
+   ]
+  ]
+ },
+ {
+  "id": "q13",
+  "category": "bug",
+  "question": "How did we stop duplicate invoices after webhook retries?",
+  "query": "webhook duplicate",
+  "gold": [
+   "s10-duplicates"
+  ],
+  "must": [
+   [
+    "idempoten"
+   ]
+  ]
+ },
+ {
+  "id": "q14",
+  "category": "decision",
+  "question": "How much does the Pro plan cost per month?",
+  "query": "Pro euros month",
+  "gold": [
+   "s11-pricing"
+  ],
+  "must": [
+   [
+    "29"
+   ]
+  ]
+ },
+ {
+  "id": "q15",
+  "category": "decision",
+  "question": "When are dunning reminders sent?",
+  "query": "dunning reminders",
+  "gold": [
+   "s12-dunning"
+  ],
+  "must": [
+   [
+    "7"
+   ],
+   [
+    "14"
+   ],
+   [
+    "30"
+   ]
+  ]
+ },
+ {
+  "id": "q16",
+  "category": "decision",
+  "question": "What is the rate limit of the public API?",
+  "query": "rate limit",
+  "gold": [
+   "s15-ratelimit"
+  ],
+  "must": [
+   [
+    "60"
+   ]
+  ]
+ },
+ {
+  "id": "q17",
+  "category": "decision",
+  "question": "How long do we keep database backups?",
+  "query": "backups pg_dump",
+  "gold": [
+   "s16-backups"
+  ],
+  "must": [
+   [
+    "30 days",
+    "30-day",
+    "thirty"
+   ]
+  ]
+ },
+ {
+  "id": "q18",
+  "category": "decision",
+  "question": "Which library do we use for translations?",
+  "query": "translations",
+  "gold": [
+   "s17-i18n"
+  ],
+  "must": [
+   [
+    "i18next"
+   ]
+  ]
+ }
+]

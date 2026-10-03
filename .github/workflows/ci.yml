@@ -18,6 +18,8 @@ jobs:
       - run: .venv/bin/pytest -q
       - name: classifier eval
         run: .venv/bin/python scripts/eval-nda.py --strict
+      - name: retrieval eval
+        run: .venv/bin/python scripts/eval-search.py --strict
       - name: end-to-end demo
         run: |
           .venv/bin/python -m obsidiyan init /tmp/vault --demo

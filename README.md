@@ -123,6 +123,36 @@ flowchart LR
 4. **Distil** (optional). A daily headless Claude run picks dense conversations, extracts claims (decisions, facts, preferences, open questions) with date and source, verifies every quote against the source and opens a pull request in the vault repository. See `scripts/auto-distill.sh`; it needs the Claude Code CLI and a vault that is a git repository.
 5. **Emit.** Claims become notes. When sources contradict each other, the newest dated user statement wins and the conflict stays visible.
 
+## Does it help an agent?
+
+`evals/agent/` measures whether a coding agent answers questions about a project's history better with obsidiyan. The project, Ledgerly, is fictional: 18 work sessions over four months with decisions, reasons, bugs and two reversals (Stripe to Mollie, Unleash to environment variables). 18 questions have fixed answers, graded automatically by key terms.
+
+The same model (Claude Haiku, Claude Code CLI) answers every question in three setups:
+
+- **none:** no access to earlier sessions
+- **raw-logs:** the raw JSONL transcripts in the working directory, searchable with Read, Grep and Glob
+- **obsidiyan:** only the MCP server
+
+The realistic history adds 240 sessions from three other fictional projects and the tool calls, tool output and thinking blocks that fill real logs. User text is 6.2% of its bytes; in my own 287 Claude Code sessions it is 7.3%.
+
+| Realistic history, 3 runs | Correct | Avg input tokens | Avg cost (USD) | Avg seconds |
+|---|---|---|---|---|
+| none | 0/54 | 3,693 | 0.0059 | 4.0 |
+| raw-logs | 53/54 | 30,256 | 0.0162 | 9.3 |
+| obsidiyan | 50/54 | 20,565 | 0.0103 | 6.8 |
+
+On the small clean history (18 sessions, one run) both raw-logs and obsidiyan answer 17 of 18, obsidiyan with 25% fewer input tokens.
+
+What this shows, and what it does not:
+
+- Without memory the agent answers nothing. With either kind of access it answers almost everything.
+- obsidiyan reaches nearly the same accuracy with about a third fewer tokens, lower cost and shorter runs. Plain grep over raw logs is a strong baseline at this size.
+- obsidiyan missed one question in every run: asked for the *current* payment provider, it found an older decision and another project that still uses Stripe, because the session that switched to Mollie never says "provider". Keyword search does not bridge vocabulary gaps.
+- The eval corpus is 3.4 MB; real logs are far larger (mine: 1.4 GB), which should widen the token gap, but this eval does not prove that. 18 questions, one model, synthetic data.
+- The eval found two search bugs, both fixed: session titles were not searchable, and a query with one word too many returned nothing instead of the best partial matches.
+
+Reproduce: `python evals/agent/build_history.py --realistic && python evals/agent/run_agent_eval.py --history realistic` (needs the Claude Code CLI). Raw answers per run are in `evals/agent/results/`. `scripts/eval-search.py` runs the retrieval part without a model in CI: the right session ranks first for 17 of 18 agent-style queries.
+
 ## How well the classifier works
 
 `scripts/eval-nda.py` runs the classifier against 43 labelled cases in `evals/nda_cases.jsonl`: known client names and project folders, e-mail addresses, six kinds of secrets, ordinary developer talk and ten hard negatives such as `Acmeware`, `postgres@localhost` or `logo@2x.png`.
@@ -204,8 +234,9 @@ chats/              provider exports you put there, never committed
 ## Development
 
 ```bash
-scripts/check.sh          # ruff, mypy --strict, pytest (271 tests)
+scripts/check.sh          # ruff, mypy --strict, pytest (274 tests)
 .venv/bin/python scripts/eval-nda.py   # classifier eval
+.venv/bin/python scripts/eval-search.py   # retrieval eval, no model needed
 vhs docs/demo.tape                     # re-record the README demo
 ```
 
