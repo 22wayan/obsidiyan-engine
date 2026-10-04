@@ -236,7 +236,7 @@ chats/              provider exports you put there, never committed
 ## Development
 
 ```bash
-scripts/check.sh          # ruff, mypy --strict, pytest (279 tests)
+scripts/check.sh          # ruff, mypy --strict, pytest (283 tests)
 .venv/bin/python scripts/eval-nda.py   # classifier eval
 .venv/bin/python scripts/eval-search.py   # retrieval eval, no model needed
 vhs docs/demo.tape                     # re-record the README demo
@@ -250,7 +250,7 @@ CI runs the same checks, an end-to-end demo and a secret scan on every push.
 
 - A personal tool in daily use, not a maintained library. Issues are welcome, support is best effort.
 - Code comments, log output and some error messages are in German.
-- Tested on macOS with Python 3.13 and in CI on Ubuntu with Python 3.12.
+- Tested on macOS with Python 3.13 and in CI on Ubuntu with Python 3.12, with Codex CLI rollouts up to version 0.160.
 
 ## License
 
