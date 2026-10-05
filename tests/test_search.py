@@ -303,3 +303,28 @@ def test_full_matches_report_every_term(tmp_path: Path) -> None:
     )
     hits = search("money cents", tmp_path, today=TODAY)
     assert (hits[0].matched_terms, hits[0].total_terms) == (2, 2)
+
+
+def test_partial_fallback_ignores_full_matches_that_are_hidden(tmp_path: Path) -> None:
+    """A full match only in an NDA doc must not leave the agent with zero visible hits."""
+    write_doc(
+        make_doc(
+            conv_id="geheim",
+            sensitivity=Sensitivity.NDA,
+            turns=(Turn(role=Role.USER, text="Switch payments from Stripe to Mollie."),),
+        ),
+        tmp_path,
+    )
+    write_doc(
+        make_doc(
+            conv_id="offen",
+            sensitivity=Sensitivity.CLEAN,
+            turns=(Turn(role=Role.USER, text="Stripe handles card payments."),),
+        ),
+        tmp_path,
+    )
+    hits = search("Stripe Mollie", tmp_path, today=TODAY)
+    assert [h.doc.conv_id for h in hits] == ["offen"]
+    assert (hits[0].matched_terms, hits[0].total_terms) == (1, 2)
+    full = search("Stripe Mollie", tmp_path, include_nda=True, today=TODAY)
+    assert [h.doc.conv_id for h in full] == ["geheim"]
