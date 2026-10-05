@@ -208,33 +208,36 @@ def search(
     ordered = sorted(terms, key=len, reverse=True)
     pattern = re.compile("|".join(re.escape(term) for term in ordered), re.IGNORECASE)
     now = today or datetime.now().date()
-    hits: list[Hit] = []
 
-    # Agents tippen oft natuerliche Wendungen. Hat kein Dokument alle Terme,
-    # liefert die Suche die besten Teil-Treffer statt einer leeren Liste und
-    # markiert sie; vorher gab der Agent bei null Treffern einfach auf.
-    candidates = _candidate_files(terms, corpus_root)
-    partial = not candidates and len(terms) > 1
-    if partial:
-        candidates = _any_term_files(terms, corpus_root)
+    def collect(candidates: list[Path], partial: bool) -> list[Hit]:
+        found: list[Hit] = []
+        for path in candidates:
+            try:
+                doc = read_doc(path)
+            except (ValueError, KeyError):
+                continue
+            if doc.sensitivity is Sensitivity.NDA and not include_nda:
+                continue
+            if source and doc.source.value != source:
+                continue
+            if project and project.lower() not in doc.project.lower():
+                continue
+            if since and (doc.started_at is None or doc.started_at.date() < since):
+                continue
+            score, snippet = _score(doc, pattern, now)
+            if score > 0:
+                matched = _matched_terms(doc, terms) if partial else len(terms)
+                found.append(Hit(path, doc, score, snippet, matched, len(terms)))
+        return found
 
-    for path in candidates:
-        try:
-            doc = read_doc(path)
-        except (ValueError, KeyError):
-            continue
-        if doc.sensitivity is Sensitivity.NDA and not include_nda:
-            continue
-        if source and doc.source.value != source:
-            continue
-        if project and project.lower() not in doc.project.lower():
-            continue
-        if since and (doc.started_at is None or doc.started_at.date() < since):
-            continue
-        score, snippet = _score(doc, pattern, now)
-        if score > 0:
-            matched = _matched_terms(doc, terms) if partial else len(terms)
-            hits.append(Hit(path, doc, score, snippet, matched, len(terms)))
+    # Agents tippen oft natuerliche Wendungen. Hat kein sichtbares Dokument alle
+    # Terme, liefert die Suche die besten Teil-Treffer statt einer leeren Liste
+    # und markiert sie. Sichtbar heisst: nach den Filtern. Ein Volltreffer, der
+    # nur in einem ausgeblendeten NDA-Dokument steht, darf den Fallback nicht
+    # abschalten, sonst sieht der Agent wieder null Treffer.
+    hits = collect(_candidate_files(terms, corpus_root), partial=False)
+    if not hits and len(terms) > 1:
+        hits = collect(_any_term_files(terms, corpus_root), partial=True)
 
     hits.sort(key=lambda h: (h.matched_terms, h.score), reverse=True)
     return hits[:limit]
