@@ -102,7 +102,8 @@ def test_multi_term_query_matches_terms_in_any_order(tmp_path: Path) -> None:
     assert [h.doc.conv_id for h in hits] == ["satzung"]
 
 
-def test_multi_term_requires_every_term(tmp_path: Path) -> None:
+def test_full_matches_rank_before_partial_ones(tmp_path: Path) -> None:
+    """Dokumente mit allen Termen stehen vorne; Teil-Treffer folgen und sind markiert."""
     write_doc(
         make_doc(
             conv_id="beide",
@@ -118,7 +119,10 @@ def test_multi_term_requires_every_term(tmp_path: Path) -> None:
         tmp_path,
     )
     hits = search("Angebot Preismodell", tmp_path, today=TODAY)
-    assert [h.doc.conv_id for h in hits] == ["beide"]
+    assert [h.doc.conv_id for h in hits] == ["beide", "nur-eins"]
+    assert [(h.matched_terms, h.total_terms) for h in hits] == [(2, 2), (1, 2)]
+    strict = search("Angebot Preismodell", tmp_path, today=TODAY, ranking="substring")
+    assert [h.doc.conv_id for h in strict] == ["beide"]
 
 
 def test_quoted_phrase_requires_exact_sequence(tmp_path: Path) -> None:
@@ -240,7 +244,7 @@ def test_ripgrep_path_intersects_terms(tmp_path: Path, monkeypatch: pytest.Monke
     )
     _install_fake_ripgrep(tmp_path, monkeypatch)
 
-    hits = search("Vorstand Satzung", corpus, today=TODAY)
+    hits = search("Vorstand Satzung", corpus, today=TODAY, ranking="substring")
     assert [h.doc.conv_id for h in hits] == ["beide"]
 
 
@@ -327,4 +331,4 @@ def test_partial_fallback_ignores_full_matches_that_are_hidden(tmp_path: Path) -
     assert [h.doc.conv_id for h in hits] == ["offen"]
     assert (hits[0].matched_terms, hits[0].total_terms) == (1, 2)
     full = search("Stripe Mollie", tmp_path, include_nda=True, today=TODAY)
-    assert [h.doc.conv_id for h in full] == ["geheim"]
+    assert full[0].doc.conv_id == "geheim"

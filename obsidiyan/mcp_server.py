@@ -78,11 +78,11 @@ def _corpus_root() -> Path:
 @server.tool(
     description=(
         "Search the knowledge base. Returns the best hits with date, source, snippet "
-        "and doc_id. All terms must occur in a document (substring, case-insensitive, "
-        "any order); put an exact phrase in double quotes. Use two to four distinctive "
-        "keywords, not full sentences. If no document contains every term, the best partial "
-        "matches come back with matched_terms below the total; then try other words. "
-        "Call get_doc for the full text."
+        "and doc_id. Ranking fuses BM25 with exact term matching: documents that contain "
+        "every term (substring, case-insensitive, any order) come first, then the best "
+        "BM25 matches, marked with matched_terms below the total. Distinctive keywords "
+        "work best, natural questions work too. An exact phrase in double quotes must "
+        "occur. Call get_doc for the full text."
     )
 )
 def search(
