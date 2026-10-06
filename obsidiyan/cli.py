@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import date
 from pathlib import Path
 
@@ -143,7 +144,14 @@ def main(argv: list[str] | None = None) -> int:
         return _init_command(args)
 
     if args.command == "search":
-        from obsidiyan.search import search
+        from obsidiyan.search import _ripgrep_binary, search
+
+        if _ripgrep_binary() is None:
+            print(
+                "hint: ripgrep (rg) not found, search uses a slower Python scan. "
+                "Install it, e.g. `brew install ripgrep` or `apt install ripgrep`.",
+                file=sys.stderr,
+            )
 
         hits = search(
             _join_query(args.query),

@@ -332,3 +332,43 @@ def test_partial_fallback_ignores_full_matches_that_are_hidden(tmp_path: Path) -
     assert (hits[0].matched_terms, hits[0].total_terms) == (1, 2)
     full = search("Stripe Mollie", tmp_path, include_nda=True, today=TODAY)
     assert full[0].doc.conv_id == "geheim"
+
+
+def test_ripgrep_found_outside_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """MCP-Clients starten den Server mit schmalem PATH; rg muss trotzdem gefunden werden."""
+    import obsidiyan.search as search_module
+
+    fake = tmp_path / "rg"
+    fake.write_text("#!/bin/sh\n")
+    fake.chmod(0o755)
+    monkeypatch.setattr(search_module.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(search_module, "_RG_LOCATIONS", (str(tmp_path / "fehlt"), str(fake)))
+    assert search_module._ripgrep_binary() == str(fake)
+    monkeypatch.setattr(search_module, "_RG_LOCATIONS", ())
+    assert search_module._ripgrep_binary() is None
+
+
+def test_ripgrep_narrows_later_terms_to_earlier_matches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ab dem zweiten Term bekommt rg nur noch die Kandidaten, nicht den ganzen Ordner."""
+    import obsidiyan.search as search_module
+
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    for i, text in enumerate(["Mollie und Stripe", "nur Stripe", "nur Mollie"]):
+        write_doc(make_doc(conv_id=f"d{i}", turns=(Turn(role=Role.USER, text=text),)), corpus)
+    calls: list[list[str]] = []
+    real_run = search_module.subprocess.run
+
+    def spy(cmd: list[str], **kwargs: object) -> object:
+        calls.append(cmd)
+        return real_run(cmd, **kwargs)  # type: ignore[call-overload]
+
+    if search_module._ripgrep_binary() is None:
+        pytest.skip("ripgrep nicht installiert")
+    monkeypatch.setattr(search_module.subprocess, "run", spy)
+    hits = search("Stripe Mollie", corpus, today=TODAY, ranking="substring")
+    assert [h.doc.conv_id for h in hits] == ["d0"]
+    assert calls[0][-1] == "."
+    assert "--" in calls[1] and "." not in calls[1][calls[1].index("--") :]

@@ -12,6 +12,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v6
+      - name: install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - run: uv venv --python 3.12 && uv pip install -e ".[dev]"
       - run: .venv/bin/ruff check .
       - run: .venv/bin/mypy obsidiyan

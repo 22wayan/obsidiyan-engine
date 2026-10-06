@@ -12,7 +12,7 @@ I built this for my own work and use it daily. This repository contains the engi
 
 ## Try it in two minutes
 
-Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.12 and [uv](https://docs.astral.sh/uv/). [ripgrep](https://github.com/BurntSushi/ripgrep) is optional but recommended: `brew install ripgrep`, `apt install ripgrep` or `winget install BurntSushi.ripgrep.MSVC`. Without it, search falls back to a pure-Python scan and returns the same results, about twice as slow on 6,500 documents (around 350 instead of 130 to 270 ms per query).
 
 ```bash
 git clone https://github.com/22wayan/obsidiyan-engine && cd obsidiyan-engine

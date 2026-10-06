@@ -16,6 +16,7 @@ NDA-Docs sind per Default unsichtbar. Der Filter sitzt hier, nicht beim Aufrufer
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -59,10 +60,23 @@ class Hit:
         return f"{head}\n    {self.snippet}\n    {self.path}"
 
 
+_RG_LOCATIONS = ("/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg", "~/.cargo/bin/rg")
+
+
 def _ripgrep_binary() -> str | None:
-    """Nur ein echtes Binary zaehlt. Auf dieser Maschine ist `rg` eine Shell-Funktion,
-    die in einem subprocess nicht existiert, deshalb wird explizit geprueft."""
-    return shutil.which("rg")
+    """Nur ein echtes Binary zaehlt; eine Shell-Funktion `rg` existiert im subprocess nicht.
+
+    MCP-Clients starten den Server oft mit schmalem PATH, deshalb werden die
+    ueblichen Installationsorte zusaetzlich geprueft.
+    """
+    found = shutil.which("rg")
+    if found:
+        return found
+    for location in _RG_LOCATIONS:
+        candidate = Path(location).expanduser()
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
 
 
 _TOKEN = re.compile(r'"([^"]+)"|(\S+)')
@@ -82,9 +96,18 @@ def _parse_query(query: str) -> list[str]:
     return terms
 
 
-def _files_matching_term(term: str, corpus_root: Path, binary: str) -> set[Path]:
+_RG_MAX_PATHS = 2000  # darueber wieder den Ordner durchsuchen, statt ARG_MAX zu riskieren
+
+
+def _files_matching_term(
+    term: str, corpus_root: Path, binary: str, within: set[Path] | None = None
+) -> set[Path]:
     # Term per -e uebergeben, sonst liest rg einen Term mit fuehrendem
-    # Bindestrich (z.B. "--include-nda") als Flag und bricht ab.
+    # Bindestrich (z.B. "--include-nda") als Flag und bricht ab. Ab dem zweiten
+    # Term durchsucht rg nur noch die Dateien, die schon alle vorigen enthalten.
+    targets = ["."]
+    if within is not None and len(within) <= _RG_MAX_PATHS:
+        targets = ["--", *sorted(path.relative_to(corpus_root).as_posix() for path in within)]
     proc = subprocess.run(
         [
             binary,
@@ -95,7 +118,7 @@ def _files_matching_term(term: str, corpus_root: Path, binary: str) -> set[Path]
             "*.md",
             "-e",
             term,
-            ".",
+            *targets,
         ],
         cwd=corpus_root,
         capture_output=True,
@@ -121,8 +144,9 @@ def _candidate_files(terms: list[str], corpus_root: Path) -> list[Path]:
     binary = _ripgrep_binary()
     if binary is not None:
         result: set[Path] | None = None
-        for term in terms:
-            matched = _files_matching_term(term, corpus_root, binary)
+        # Laengere Terme sind meist seltener und verkleinern die Menge zuerst.
+        for term in sorted(terms, key=len, reverse=True):
+            matched = _files_matching_term(term, corpus_root, binary, within=result)
             result = matched if result is None else result & matched
             if not result:
                 return []
