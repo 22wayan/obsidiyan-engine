@@ -66,7 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sea = sub.add_parser(
         "search",
-        help='search the corpus; all terms must match, "..." keeps a phrase together',
+        help='search the corpus; documents with every term rank first, "..." must occur',
     )
     sea.add_argument(
         "query",

@@ -119,7 +119,7 @@ flowchart LR
 
 1. **Ingest.** Adapters turn session logs and provider exports into one Markdown file per conversation. User turns, assistant turns and machine-written summaries stay separate.
 2. **Classify.** A rule-based classifier marks every conversation as clean, confidential or copyrighted, based on the project and the text. Search hides confidential documents unless `include_nda` is set.
-3. **Search.** Plain-text search over the corpus, no vector index. User statements rank above assistant answers, newer above older.
+3. **Search.** Keyword search over the corpus, no vector index. BM25 ranks every document; documents that contain all query terms come first, user statements above assistant answers and newer above older. The BM25 index is a cache under `corpus/.search-index/` and rebuilds itself when the corpus changes (about 3 s for 6,500 documents).
 4. **Distil** (optional). A daily headless Claude run picks dense conversations, extracts claims (decisions, facts, preferences, open questions) with date and source, verifies every quote against the source and opens a pull request in the vault repository. See `scripts/auto-distill.sh`; it needs the Claude Code CLI and a vault that is a git repository.
 5. **Emit.** Claims become notes. When sources contradict each other, the newest dated user statement wins and the conflict stays visible.
 
@@ -177,7 +177,18 @@ Detected secrets are also removed from the text at ingest, not only classified: 
 - **The source decides confidentiality, not the claim.** Claims from confidential sources can only land in `private/`, which is git-ignored. `scripts/verify-nda.py` fails if anything confidential would reach the committed layer.
 - **The note graph has invariants.** Every note except `BRAIN.md` has exactly one parent. `scripts/verify-graph.py` fails on orphans, duplicate names and ambiguous links.
 - **Writes are guarded.** `remember` refuses to append to a generated note, because the next emit would overwrite the addition. It also rejects e-mail addresses, likely secrets and confidential names in the committed layer.
-- **No vector database.** Plain search answered the questions I actually ask, so embeddings stayed out.
+- **No vector database.** BM25 plus exact matching answers most of the questions I actually ask. Embeddings only come in if a measured vocabulary gap justifies them.
+
+### Search on real questions
+
+Ten questions I actually asked in past chats ("I installed Linux Mint on my old MacBook, remember?", "didn't we have two Brevo modules?"), scored on my own corpus of about 6,500 documents. A hit means an *earlier* session that holds the answer is in the top 5, so later mentions cannot help.
+
+| Ranking | Top 1 | Top 5 |
+|---|---|---|
+| Substring, all terms (before) | 1 of 10 | 2 of 10 |
+| BM25 fused with exact matches (now) | 5 of 10 | 8 of 10 |
+
+BM25 runs without the recency boost, because these questions point at old sessions; exact matches keep it, so "what is current" questions still favour new sessions. A second set of 16 paraphrased questions moved from 7 to 9 of 16 as full sentences; as short keyword queries it stayed at 10 of 16, with one question gained and one lost. The 18 agent-style queries in `scripts/eval-search.py` stay at 17 of 18. The question sets point into my private corpus and are not published.
 
 ## Command reference
 
@@ -185,7 +196,7 @@ Detected secrets are also removed from the text at ingest, not only classified: 
 |---|---|
 | `init [path] [--demo]` | Create a vault; `--demo` adds four fictional sessions |
 | `ingest --source <name>` | Read one source: `claude-code`, `codex`, `chatgpt`, `gemini`, `claude-web`, `memory`, `course` |
-| `search <terms>` | All terms must match; `"..."` keeps a phrase; filters `--since`, `--source`, `--project`, `--include-nda` |
+| `search <terms>` | Ranked: documents with every term first, then BM25; `"..."` must occur as a phrase; filters `--since`, `--source`, `--project`, `--include-nda` |
 | `stats` | Documents per source and per sensitivity |
 | `distill`, `show`, `add-claims`, `add-reviews`, `emit`, `progress` | The distillation pipeline, see below |
 
@@ -231,12 +242,13 @@ chats/              provider exports you put there, never committed
 - **`OBSIDIYAN_HOME=... is not a directory`**: run `init` first, or fix the path.
 - **`No corpus under ...`**: the vault exists but nothing was ingested yet. Run an ingest or `scripts/refresh.sh`.
 - **Search finds nothing you know is there**: the document may be confidential. Try `--include-nda`, then check the deny lists.
+- **Search results look stale**: the BM25 cache in `corpus/.search-index/` rebuilds when files change. Deleting the folder is always safe.
 - **`ingest --source claude-code` reads 0 files**: Claude Code stores sessions under `~/.claude/projects/<slug>/`. Pass `--session-root` if yours live elsewhere.
 
 ## Development
 
 ```bash
-scripts/check.sh          # ruff, mypy --strict, pytest (283 tests)
+scripts/check.sh          # ruff, mypy --strict, pytest (296 tests)
 .venv/bin/python scripts/eval-nda.py   # classifier eval
 .venv/bin/python scripts/eval-search.py   # retrieval eval, no model needed
 vhs docs/demo.tape                     # re-record the README demo
