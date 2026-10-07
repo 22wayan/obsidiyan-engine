@@ -69,7 +69,9 @@ async def run() -> int:
         print(f"  get_doc ok, {doc['total_chars']} characters")
 
         private_probe = PRIVATE_PROBE
-        leaks = rows(await session.call_tool("search", {"query": private_probe, "limit": 10}))
+        # Ohne Treffer liefert search eine Hinweiszeile ohne doc_id; nur echte Treffer zaehlen.
+        probe = {"query": private_probe, "limit": 10}
+        leaks = [hit for hit in rows(await session.call_tool("search", probe)) if "doc_id" in hit]
         if leaks:
             print("FAIL: confidential hit returned without include_nda", file=sys.stderr)
             return 1
