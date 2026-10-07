@@ -193,6 +193,19 @@ Ten questions I actually asked in past chats ("I installed Linux Mint on my old 
 
 BM25 runs without the recency boost, because these questions point at old sessions; exact matches keep it, so "what is current" questions still favour new sessions. A second set of 16 paraphrased questions moved from 7 to 9 of 16 as full sentences; as short keyword queries it stayed at 10 of 16, with one question gained and one lost. The 18 agent-style queries in `scripts/eval-search.py` stay at 17 of 18. The question sets point into my private corpus and are not published.
 
+### Recall hook: memory before the agent answers
+
+Agents rarely ask their memory on their own. In 1,250 of my real prompts since obsidiyan was connected, a classifier marked 60 as clearly needing earlier sessions; the agent called the MCP search in 11 of them. In about half of the rest it read vault files directly or asked another knowledge base, in the other half it did not look at all.
+
+`python -m obsidiyan.hook` is a Claude Code `UserPromptSubmit` hook. It fires on recall cues ("do you remember", "last time", "wie hatten wir", ...) or on project names taken from the vault's note file names, except the name of the current repository. It then runs the normal search, without the cue words and with the project name required, and puts the top three hits in front of the prompt. Confidential hits are only counted. It never blocks: any error ends silently.
+
+```json
+"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command",
+  "command": "OBSIDIYAN_HOME=~/vault ~/obsidiyan-engine/.venv/bin/python -m obsidiyan.hook"}]}]}
+```
+
+Rules fixed before measuring, then measured once on the same 1,250 prompts: it fires on 36 of the 60 prompts that clearly needed memory (60%) and on 131 of 1,039 that did not (13%). It takes 0.05 s when it stays silent and 0.4 to 0.9 s when it searches. Whether agents answer better with it is not measured yet.
+
 ### Optional: local embeddings
 
 `uv pip install -e ".[embeddings]"` adds a local embedding model (Qwen3-Embedding-0.6B via sentence-transformers; PyTorch, runs on the Apple Silicon GPU). `obsidiyan embed` builds one vector per turn under `corpus/.search-index/` and later only re-encodes documents whose title or text changed; `search --ranking hybrid` (CLI), `ranking="hybrid"` (MCP) or `OBSIDIYAN_RANKING=hybrid` mixes them into the BM25 ranking with half weight. Nothing leaves the machine after the one-time model download. Without the extra or the index, search falls back to BM25 and says so in every hit.
@@ -267,7 +280,7 @@ chats/              provider exports you put there, never committed
 ## Development
 
 ```bash
-scripts/check.sh          # ruff, mypy --strict, pytest (311 tests)
+scripts/check.sh          # ruff, mypy --strict, pytest (328 tests)
 .venv/bin/python scripts/eval-nda.py   # classifier eval
 .venv/bin/python scripts/eval-search.py   # retrieval eval, no model needed
 vhs docs/demo.tape                     # re-record the README demo
