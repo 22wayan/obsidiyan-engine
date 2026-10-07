@@ -150,6 +150,19 @@ def _hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:20]
 
 
+def _content_key(text: str) -> str:
+    """Hash ueber Titel und Text, ohne die uebrigen Metadaten.
+
+    Der taegliche Refresh schreibt Frontmatter neu (Datum, Parent-Links), ohne
+    den Inhalt zu aendern. Ein Hash ueber die ganze Datei liess dann taeglich
+    rund 1.600 Kurs-Dokumente neu kodieren.
+    """
+    match = _FRONTMATTER.match(text)
+    if not match:
+        return _hash(text)
+    return _hash(_field(match.group(1), "title") + "\n" + text[match.end() :])
+
+
 def _load(directory: Path, model: str) -> DenseIndex | None:
     """Index von Platte; jeder Defekt heisst "neu bauen", nie Absturz."""
     np = _numpy()
@@ -252,10 +265,12 @@ def update_index(
         except FileNotFoundError:
             continue
         rel = path.relative_to(corpus_root).as_posix()
-        digest = _hash(text)
+        digest = _content_key(text)
         owner = len(docs)
         docs.append(rel)
-        if old is not None and old.hashes.get(rel) == digest and rel in old_rows:
+        stored = old.hashes.get(rel) if old is not None else None
+        # _hash(text) erkennt Indizes, die noch mit dem Ganzdatei-Hash gebaut wurden.
+        if old is not None and stored in (digest, _hash(text)) and rel in old_rows:
             parts.append(old.vectors[old_rows[rel]])
             owners.extend([owner] * len(old_rows[rel]))
             hashes[rel] = digest
