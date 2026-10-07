@@ -160,6 +160,7 @@ def main() -> int:
     parser.add_argument("--history", choices=["clean", "realistic"], default="clean")
     parser.add_argument("--ranking", choices=["fused", "hybrid", "substring"], default="fused")
     parser.add_argument("--run", default="", help="suffix for the result files, e.g. run1")
+    parser.add_argument("--repeat", type=int, default=1, help="runs on the same vault")
     args = parser.parse_args()
     if shutil.which("claude") is None:
         print("claude CLI not found", file=sys.stderr)
@@ -185,23 +186,24 @@ def main() -> int:
     questions = json.loads((EVAL / "questions.json").read_text(encoding="utf-8"))[: args.limit]
     conditions = args.conditions.split(",")
     jobs = [(c, q) for c in conditions for q in questions]
-    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        rows = list(pool.map(lambda job: run_one(job[0], job[1], args.model, dirs, mcp), jobs))
-
     RESULTS.mkdir(exist_ok=True)
-    suffix = f"-{args.run}" if args.run else ""
-    stamp = f"{date.today().isoformat()}-{args.history}-{args.model}-{args.ranking}{suffix}"
-    (RESULTS / f"{stamp}.json").write_text(json.dumps(rows, indent=1), encoding="utf-8")
-    table = summarise(rows, conditions)
-    (RESULTS / f"{stamp}.md").write_text(
-        f"# Agent eval {stamp}\n\n{len(questions)} questions, history {args.history}, "
-        f"model {args.model}, ranking {args.ranking}.\n\n{table}\n",
-        encoding="utf-8",
-    )
-    print(table)
-    errors = [r for r in rows if r["error"]]
-    if errors:
-        print(f"\n{len(errors)} runs ended with an error", file=sys.stderr)
+    for repeat in range(1, args.repeat + 1):
+        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            rows = list(pool.map(lambda job: run_one(job[0], job[1], args.model, dirs, mcp), jobs))
+        run = args.run or (f"run{repeat}" if args.repeat > 1 else "")
+        suffix = f"-{run}" if run else ""
+        stamp = f"{date.today().isoformat()}-{args.history}-{args.model}-{args.ranking}{suffix}"
+        (RESULTS / f"{stamp}.json").write_text(json.dumps(rows, indent=1), encoding="utf-8")
+        table = summarise(rows, conditions)
+        (RESULTS / f"{stamp}.md").write_text(
+            f"# Agent eval {stamp}\n\n{len(questions)} questions, history {args.history}, "
+            f"model {args.model}, ranking {args.ranking}.\n\n{table}\n",
+            encoding="utf-8",
+        )
+        print(f"{stamp}\n{table}", flush=True)
+        errors = [r for r in rows if r["error"]]
+        if errors:
+            print(f"{len(errors)} runs ended with an error", file=sys.stderr)
     return 0
 
 

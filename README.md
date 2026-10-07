@@ -139,7 +139,9 @@ The realistic history adds 240 sessions from three other fictional projects and 
 |---|---|---|---|---|
 | none | 0/54 | 3,693 | 0.0059 | 4.0 |
 | raw-logs | 53/54 | 30,256 | 0.0162 | 9.3 |
-| obsidiyan | 50/54 | 20,565 | 0.0103 | 6.8 |
+| obsidiyan, substring ranking (Oct 3) | 50/54 | 20,565 | 0.0103 | 6.8 |
+| obsidiyan, BM25 ranking (Oct 7, current) | 51/54 | 18,723 | 0.0089 | 9.5 |
+| obsidiyan, BM25 plus embeddings (Oct 7) | 48/54 | 19,547 | 0.0089 | 25.8 |
 
 On the small clean history (18 sessions, one run) both raw-logs and obsidiyan answer 17 of 18, obsidiyan with 25% fewer input tokens.
 
@@ -147,7 +149,8 @@ What this shows, and what it does not:
 
 - Without memory the agent answers nothing. With either kind of access it answers almost everything.
 - obsidiyan reaches nearly the same accuracy with about a third fewer tokens, lower cost and shorter runs. Plain grep over raw logs is a strong baseline at this size.
-- obsidiyan missed one question in every run: asked for the *current* payment provider, it found an older decision and another project that still uses Stripe, because the session that switched to Mollie never says "provider". Keyword search does not bridge vocabulary gaps.
+- With substring ranking obsidiyan missed one question in every run: asked for the *current* payment provider, it found an older decision and another project that still uses Stripe, because the session that switched to Mollie never says "provider". With BM25 ranking the agent answers it in all three runs; the only remaining miss is q11 (passkeys not mentioned).
+- Adding local embeddings made the agent worse, not better: 48 of 54, the payment question right in only one of three runs, two new misses, and runs nearly three times as long. The extra loosely related hits seem to distract an agent that can rephrase its own queries. Embeddings therefore stay opt-in (see below).
 - The eval corpus is 3.4 MB; real logs are far larger (mine: 1.4 GB), which should widen the token gap, but this eval does not prove that. 18 questions, one model, synthetic data.
 - The eval found two search bugs, both fixed: session titles were not searchable, and a query with one word too many returned nothing instead of the best partial matches.
 
@@ -177,7 +180,7 @@ Detected secrets are also removed from the text at ingest, not only classified: 
 - **The source decides confidentiality, not the claim.** Claims from confidential sources can only land in `private/`, which is git-ignored. `scripts/verify-nda.py` fails if anything confidential would reach the committed layer.
 - **The note graph has invariants.** Every note except `BRAIN.md` has exactly one parent. `scripts/verify-graph.py` fails on orphans, duplicate names and ambiguous links.
 - **Writes are guarded.** `remember` refuses to append to a generated note, because the next emit would overwrite the addition. It also rejects e-mail addresses, likely secrets and confidential names in the committed layer.
-- **No vector database.** BM25 plus exact matching answers most of the questions I actually ask. Embeddings only come in if a measured vocabulary gap justifies them.
+- **No vector database by default.** BM25 plus exact matching answers most of the questions I actually ask. Local embeddings are available as an opt-in mode because they help with some human questions, but they did not help the agent (numbers above and below).
 
 ### Search on real questions
 
@@ -189,6 +192,22 @@ Ten questions I actually asked in past chats ("I installed Linux Mint on my old 
 | BM25 fused with exact matches (now) | 5 of 10 | 8 of 10 |
 
 BM25 runs without the recency boost, because these questions point at old sessions; exact matches keep it, so "what is current" questions still favour new sessions. A second set of 16 paraphrased questions moved from 7 to 9 of 16 as full sentences; as short keyword queries it stayed at 10 of 16, with one question gained and one lost. The 18 agent-style queries in `scripts/eval-search.py` stay at 17 of 18. The question sets point into my private corpus and are not published.
+
+### Optional: local embeddings
+
+`uv pip install -e ".[embeddings]"` adds a local embedding model (Qwen3-Embedding-0.6B via sentence-transformers; PyTorch, runs on the Apple Silicon GPU). `obsidiyan embed` builds one vector per turn under `corpus/.search-index/` and later only re-encodes documents whose title or text changed; `search --ranking hybrid` (CLI), `ranking="hybrid"` (MCP) or `OBSIDIYAN_RANKING=hybrid` mixes them into the BM25 ranking with half weight. Nothing leaves the machine after the one-time model download. Without the extra or the index, search falls back to BM25 and says so in every hit.
+
+Measured on my corpus (6,488 documents, 70,147 chunks, about four hours for the first build on an M5, 144 MB on disk):
+
+| | BM25 | BM25 plus embeddings |
+|---|---|---|
+| 16 real questions, top 5 | 13 | 14 (none lost) |
+| 34 paraphrased questions as sentences, top 5 | 16 | 20 (3 lost) |
+| 34 paraphrased questions as keywords, top 5 | 16 | 21 (none lost) |
+| Agent eval above | 51/54 | 48/54 |
+| Latency per query (median, after the first) | 280 ms | 480 ms; first query in a process about 3 s |
+
+The weight of 0.5 was fixed before the final run and not tuned afterwards. Qwen3 was chosen over IBM granite-embedding-311m-multilingual-r2 (faster, but lost a real question) on the same question sets.
 
 ## Command reference
 
@@ -248,7 +267,7 @@ chats/              provider exports you put there, never committed
 ## Development
 
 ```bash
-scripts/check.sh          # ruff, mypy --strict, pytest (296 tests)
+scripts/check.sh          # ruff, mypy --strict, pytest (311 tests)
 .venv/bin/python scripts/eval-nda.py   # classifier eval
 .venv/bin/python scripts/eval-search.py   # retrieval eval, no model needed
 vhs docs/demo.tape                     # re-record the README demo

@@ -148,3 +148,15 @@ def test_reads_index_written_before_versioned_vector_files(tmp_path: Path) -> No
     (directory / "manifest.json").write_text(json.dumps(manifest))
     dense._MEMORY.clear()
     assert dense.update_index(tmp_path, fake_encoder) == (0, 1)
+
+
+def test_frontmatter_only_change_does_not_reencode(tmp_path: Path) -> None:
+    """Der Refresh schreibt Metadaten neu; der Inhalt bleibt, also kein neues Kodieren."""
+    _doc(tmp_path, "a", "Notiz ueber Mollie")
+    dense.update_index(tmp_path, fake_encoder)
+    path = next(tmp_path.rglob("*.md"))
+    text = path.read_text()
+    path.write_text(text.replace("---\n", "---\nparent: '[[corpus/_index]]'\n", 1))
+    assert dense.update_index(tmp_path, fake_encoder) == (0, 1)
+    path.write_text(path.read_text().replace("Mollie", "Stripe"))
+    assert dense.update_index(tmp_path, fake_encoder) == (1, 1)
