@@ -4,4 +4,6 @@
 
 | Condition | Correct | Avg input tokens | Avg cost (USD) | Avg turns | Avg seconds |
 |---|---|---|---|---|---|
-| obsidiyan | 17/18 | 20,096 | 0.0079 | 3.0 | 7.2 |
+| obsidiyan | 16/18 | 20,096 | 0.0079 | 3.0 | 7.2 |
+
+Regraded on 2026-10-08 with reject phrases (evals/agent/regrade.py).

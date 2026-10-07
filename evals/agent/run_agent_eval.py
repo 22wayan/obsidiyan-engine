@@ -83,8 +83,15 @@ def build_vault(base: Path, history: Path, ranking: str) -> Path:
     return vault
 
 
-def grade(answer: str, must: list[list[str]]) -> bool:
+def grade(answer: str, must: list[list[str]], reject: list[str] | None = None) -> bool:
+    """Alle must-Gruppen getroffen und keine reject-Phrase.
+
+    reject faengt Antworten ab, die den Schluesselbegriff nur nebenbei nennen,
+    etwa "wir nutzen Stripe statt Mollie" bei der Frage nach Mollie.
+    """
     text = answer.lower()
+    if any(phrase in text for phrase in reject or []):
+        return False
     return all(any(alt in text for alt in group) for group in must)
 
 
@@ -116,7 +123,7 @@ def run_one(
         "condition": condition,
         "id": question["id"],
         "category": question["category"],
-        "correct": grade(answer, question["must"]),
+        "correct": grade(answer, question["must"], question.get("reject")),
         "answer": answer.strip()[:400],
         "error": bool(out.get("is_error")),
         "turns": out.get("num_turns"),

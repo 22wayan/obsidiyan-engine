@@ -29,7 +29,7 @@
   "condition": "obsidiyan",
   "id": "q03",
   "category": "superseded",
-  "correct": true,
+  "correct": false,
   "answer": "Stripe is the payment provider Ledgerly uses for new customers. The decision was made in March 2026 because Stripe supports SEPA Direct Debit and has better-documented webhooks compared to the Mollie alternative.",
   "error": false,
   "turns": 3,

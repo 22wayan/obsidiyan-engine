@@ -39,6 +39,15 @@
    [
     "mollie"
    ]
+  ],
+  "reject": [
+   "uses stripe",
+   "uses **stripe",
+   "stripe is the",
+   "**stripe** is",
+   "stripe as the",
+   "stripe as its",
+   "stripe for new"
   ]
  },
  {
@@ -183,6 +192,11 @@
     "environment variable",
     "env var"
    ]
+  ],
+  "reject": [
+   "still use unleash",
+   "still uses unleash",
+   "yes, we still"
   ]
  },
  {
