@@ -29,7 +29,7 @@
   "condition": "obsidiyan",
   "id": "q03",
   "category": "superseded",
-  "correct": true,
+  "correct": false,
   "answer": "Ledgerly uses Stripe as the payment provider for new customers. The team chose Stripe over Mollie because it supports SEPA Direct Debit and has better-documented webhooks.",
   "error": false,
   "turns": 5,
