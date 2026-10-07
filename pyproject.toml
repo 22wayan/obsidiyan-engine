@@ -9,7 +9,10 @@ dependencies = ["pydantic>=2.9", "pyyaml>=6"]
 # dev ist genau das, was ein frisches Worktree fuer pytest, ruff und mypy braucht.
 [project.optional-dependencies]
 mcp = ["mcp>=2"]
-dev = ["obsidiyan[mcp]", "pytest>=8", "ruff>=0.6", "mypy>=1.11", "types-PyYAML"]
+# Lokale Embeddings fuer ranking="hybrid". Zieht PyTorch; auf Apple Silicon
+# rechnet es auf der GPU (MPS). Ohne das Extra bleibt die Suche bei BM25.
+embeddings = ["sentence-transformers>=5", "numpy>=1.26"]
+dev = ["obsidiyan[mcp]", "numpy>=1.26", "pytest>=8", "ruff>=0.6", "mypy>=1.11", "types-PyYAML"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -37,6 +40,10 @@ python_version = "3.12"
 strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["sentence_transformers"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

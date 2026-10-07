@@ -83,3 +83,14 @@ def test_remember_private_writes_and_ingests(
     assert result["sensitivity"] == "nda"
     assert result["path"] == "private/projekt/status.md"
     assert calls == [("memory", tmp_path, False)]
+
+
+def test_search_reports_fallback_when_no_embedding_index() -> None:
+    rows = mcp_server.search("Entscheidung", ranking="hybrid")
+    assert rows and all(r["ranking"].startswith("fused (no embedding index") for r in rows)
+
+
+def test_empty_search_still_reports_the_ranking() -> None:
+    rows = mcp_server.search("xyzzy-gibt-es-nicht", ranking="hybrid")
+    assert rows == [{"note": "no results", "ranking": rows[0]["ranking"]}]
+    assert rows[0]["ranking"].startswith("fused (no embedding index")
