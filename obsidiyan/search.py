@@ -25,8 +25,9 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Literal
 
-from obsidiyan import bm25
+from obsidiyan import bm25, dense
 from obsidiyan.corpusio import read_doc
+from obsidiyan.dense import Encoder
 from obsidiyan.models import Doc, Role, Sensitivity
 
 _USER_WEIGHT = 2.0
@@ -37,7 +38,8 @@ _RECENCY_HALFLIFE_DAYS = 120.0
 _BM25_DEPTH = 100  # RRF-Beitraege jenseits von Rang 100 sind kleiner als 1/160
 _RRF_K = 60  # Standardwert aus Cormack et al. 2009, braucht keine gelabelten Daten
 
-Ranking = Literal["fused", "substring"]
+Ranking = Literal["fused", "hybrid", "substring"]
+_DENSE_WEIGHT = 0.5  # vorab festgelegt (evals/suche), Stichwortliste zaehlt doppelt
 
 
 @dataclass(frozen=True)
@@ -259,14 +261,17 @@ def search(
     project: str | None = None,
     today: date | None = None,
     ranking: Ranking = "fused",
+    encoder: Encoder | None = None,
 ) -> list[Hit]:
     """Beste Treffer fuer eine Query, sichtbar nach den Filtern.
 
     ranking="fused" (Standard) mischt zwei Ranglisten per Reciprocal Rank
     Fusion: die Substring-Suche (alle Terme, Teil-Treffer als Fallback, mit
     Recency) und BM25 ueber den ganzen Corpus. Dokumente mit allen Termen
-    stehen weiterhin vorne. ranking="substring" ist das alte Verhalten und
-    dient als Vergleichsbasis in den Evals.
+    stehen weiterhin vorne. ranking="hybrid" mischt diese Liste zusaetzlich mit
+    lokalen Embeddings (Gewicht 0,5); ohne Embedding-Index bleibt es bei
+    "fused". ranking="substring" ist das alte Verhalten und dient als
+    Vergleichsbasis in den Evals.
     """
     terms = _parse_query(query)
     if not terms:
@@ -330,10 +335,8 @@ def search(
         doc = visible(path)
         if doc is None:
             continue
-        if required:
-            text = " ".join([doc.title or "", *(turn.text for turn in doc.turns)]).lower()
-            if not all(term in text for term in required):
-                continue
+        if required and not _contains_all(doc, required):
+            continue
         _, snippet = _score(doc, pattern, now)
         lexical.append(Hit(path, doc, bm25_score, snippet, _matched_terms(doc, terms), len(terms)))
         if len(lexical) >= _BM25_DEPTH:
@@ -341,10 +344,14 @@ def search(
 
     # Nur Fuellwoerter oder zu kurze Terme ("to be", "C++"): BM25 findet nichts,
     # dann bleibt der alte Teil-Treffer-Fallback.
+    # Bei "hybrid" dient die Teil-Treffer-Liste als Stichwort-Rangliste, damit die
+    # Embeddings auch dann laufen: genau bei solchen Wortluecken helfen sie.
     if not full_matches and not lexical and len(terms) > 1:
         partial = collect(_any_term_files(terms, corpus_root), partial=True)
         partial.sort(key=lambda h: (h.matched_terms, h.score), reverse=True)
-        return partial[:limit]
+        if ranking != "hybrid":
+            return partial[:limit]
+        lexical = partial
 
     fused: dict[Path, float] = {}
     first_seen: dict[Path, Hit] = {}
@@ -364,4 +371,41 @@ def search(
         for path, score in fused.items()
     ]
     merged.sort(key=lambda h: (h.matched_terms == h.total_terms, h.score), reverse=True)
-    return merged[:limit]
+    if ranking != "hybrid" or not dense.available(corpus_root):
+        return merged[:limit]
+
+    semantic: list[Hit] = []
+    # EmbeddingsUnavailable (Extra fehlt, Index passt nicht) geht bewusst an den
+    # Aufrufer: CLI und MCP fallen sichtbar auf "fused" zurueck.
+    for path, similarity in dense.iter_ranked(corpus_root, query, encoder=encoder):
+        doc = visible(path)
+        if doc is None or (required and not _contains_all(doc, required)):
+            continue
+        _, snippet = _score(doc, pattern, now)
+        semantic.append(Hit(path, doc, similarity, snippet, _matched_terms(doc, terms), len(terms)))
+        if len(semantic) >= _BM25_DEPTH:
+            break
+
+    hybrid: dict[Path, float] = {}
+    for ranked, weight in ((merged[:_BM25_DEPTH], 1.0), (semantic, _DENSE_WEIGHT)):
+        for rank, hit in enumerate(ranked):
+            hybrid[hit.path] = hybrid.get(hit.path, 0.0) + weight / (_RRF_K + rank + 1)
+            first_seen.setdefault(hit.path, hit)
+    combined = [
+        Hit(
+            path,
+            first_seen[path].doc,
+            score,
+            first_seen[path].snippet,
+            first_seen[path].matched_terms,
+            len(terms),
+        )
+        for path, score in hybrid.items()
+    ]
+    combined.sort(key=lambda h: h.score, reverse=True)
+    return combined[:limit]
+
+
+def _contains_all(doc: Doc, required: list[str]) -> bool:
+    text = " ".join([doc.title or "", *(turn.text for turn in doc.turns)]).lower()
+    return all(term in text for term in required)

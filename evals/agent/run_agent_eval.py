@@ -60,7 +60,7 @@ TOOLS = {
 }
 
 
-def build_vault(base: Path, history: Path) -> Path:
+def build_vault(base: Path, history: Path, ranking: str) -> Path:
     vault = base / "vault"
     vault.mkdir(parents=True)
     os.environ["OBSIDIYAN_HOME"] = str(vault)
@@ -76,6 +76,10 @@ def build_vault(base: Path, history: Path) -> Path:
         source_overrides_path=vault / "private" / "nda-source-overrides.json",
         require_source_overrides=False,
     )
+    if ranking == "hybrid":
+        from obsidiyan import dense
+
+        dense.update_index(vault / "corpus", dense.sentence_transformer_encoder())
     return vault
 
 
@@ -154,6 +158,8 @@ def main() -> int:
     parser.add_argument("--conditions", default="none,raw-logs,obsidiyan")
     parser.add_argument("--limit", type=int, default=None, help="only the first N questions")
     parser.add_argument("--history", choices=["clean", "realistic"], default="clean")
+    parser.add_argument("--ranking", choices=["fused", "hybrid", "substring"], default="fused")
+    parser.add_argument("--run", default="", help="suffix for the result files, e.g. run1")
     args = parser.parse_args()
     if shutil.which("claude") is None:
         print("claude CLI not found", file=sys.stderr)
@@ -164,7 +170,7 @@ def main() -> int:
     if not history.is_dir():
         print(f"{history} missing, run build_history.py --realistic first", file=sys.stderr)
         return 2
-    vault = build_vault(base, history)
+    vault = build_vault(base, history, args.ranking)
     dirs = {c: base / c for c in ("none", "raw-logs", "obsidiyan")}
     for d in dirs.values():
         d.mkdir()
@@ -173,7 +179,7 @@ def main() -> int:
     mcp.write_text(json.dumps({"mcpServers": {"obsidiyan": {
         "command": sys.executable,
         "args": ["-m", "obsidiyan.mcp_server"],
-        "env": {"OBSIDIYAN_HOME": str(vault)},
+        "env": {"OBSIDIYAN_HOME": str(vault), "OBSIDIYAN_RANKING": args.ranking},
     }}}), encoding="utf-8")
 
     questions = json.loads((EVAL / "questions.json").read_text(encoding="utf-8"))[: args.limit]
@@ -183,12 +189,13 @@ def main() -> int:
         rows = list(pool.map(lambda job: run_one(job[0], job[1], args.model, dirs, mcp), jobs))
 
     RESULTS.mkdir(exist_ok=True)
-    stamp = f"{date.today().isoformat()}-{args.history}-{args.model}"
+    suffix = f"-{args.run}" if args.run else ""
+    stamp = f"{date.today().isoformat()}-{args.history}-{args.model}-{args.ranking}{suffix}"
     (RESULTS / f"{stamp}.json").write_text(json.dumps(rows, indent=1), encoding="utf-8")
     table = summarise(rows, conditions)
     (RESULTS / f"{stamp}.md").write_text(
         f"# Agent eval {stamp}\n\n{len(questions)} questions, history {args.history}, "
-        f"model {args.model}.\n\n{table}\n",
+        f"model {args.model}, ranking {args.ranking}.\n\n{table}\n",
         encoding="utf-8",
     )
     print(table)

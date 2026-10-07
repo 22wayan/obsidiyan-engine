@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -12,6 +13,13 @@ from obsidiyan.corpusio import iter_docs, read_doc
 from obsidiyan.models import Sensitivity
 
 DEFAULT_CORPUS = paths.corpus_root()
+
+
+def _ranking_from_env() -> str:
+    value = os.environ.get("OBSIDIYAN_RANKING", "fused")
+    if value not in ("fused", "hybrid", "substring"):
+        raise SystemExit(f"OBSIDIYAN_RANKING must be fused, hybrid or substring, not {value!r}")
+    return value
 
 
 def _join_query(terms: list[str]) -> str:
@@ -55,6 +63,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="abort if private/nda-source-overrides.json is missing or empty",
     )
 
+    emb = sub.add_parser(
+        "embed", help='build or refresh the local embedding index (needs ".[embeddings]")'
+    )
+    emb.add_argument("--model", default=None, help="sentence-transformers model id")
+
     init = sub.add_parser("init", help="create a new vault (BRAIN.md, hub notes, private/)")
     init.add_argument(
         "path",
@@ -80,6 +93,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sea.add_argument(
         "--since", type=date.fromisoformat, default=None, help="only documents from YYYY-MM-DD on"
+    )
+    sea.add_argument(
+        "--ranking",
+        choices=["fused", "hybrid", "substring"],
+        default=_ranking_from_env(),
+        help="fused: BM25 plus exact matches (default); hybrid: plus local embeddings",
     )
     sea.add_argument("--source", default=None, help="only this source, e.g. claude-code")
     sea.add_argument("--project", default=None, help="only this project")
@@ -143,7 +162,31 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "init":
         return _init_command(args)
 
+    if args.command == "embed":
+        from obsidiyan import dense
+
+        model = args.model or dense.current_model()
+        if args.model and args.model != dense.current_model():
+            print(
+                f"note: search uses {dense.current_model()}; set OBSIDIYAN_EMBED_MODEL={model} "
+                "so it uses this index",
+                file=sys.stderr,
+            )
+        try:
+            encoder = dense.sentence_transformer_encoder(model)
+        except dense.EmbeddingsUnavailable as exc:
+            print(exc, file=sys.stderr)
+            return 1
+
+        def report(done: int, total: int) -> None:
+            print(f"\r{done}/{total} documents encoded", end="", file=sys.stderr, flush=True)
+
+        encoded, total = dense.update_index(args.corpus, encoder, model=model, progress=report)
+        print(f"\n{encoded} of {total} documents encoded, the rest reused", file=sys.stderr)
+        return 0
+
     if args.command == "search":
+        from obsidiyan.dense import EmbeddingsUnavailable
         from obsidiyan.search import _ripgrep_binary, search
 
         if _ripgrep_binary() is None:
@@ -153,15 +196,18 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
 
-        hits = search(
-            _join_query(args.query),
-            args.corpus,
-            limit=args.limit,
-            include_nda=args.include_nda,
-            since=args.since,
-            source=args.source,
-            project=args.project,
-        )
+        options = {
+            "limit": args.limit,
+            "include_nda": args.include_nda,
+            "since": args.since,
+            "source": args.source,
+            "project": args.project,
+        }
+        try:
+            hits = search(_join_query(args.query), args.corpus, ranking=args.ranking, **options)
+        except EmbeddingsUnavailable as exc:
+            print(f"hint: {exc}; falling back to ranking=fused", file=sys.stderr)
+            hits = search(_join_query(args.query), args.corpus, ranking="fused", **options)
         if not hits:
             print("no results")
             return 0

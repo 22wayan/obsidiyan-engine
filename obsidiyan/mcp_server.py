@@ -10,13 +10,14 @@ Gebaut gegen mcp 2.0 (MCPServer, nicht das aeltere FastMCP).
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from obsidiyan import ingest, paths
+from obsidiyan import dense, ingest, paths
 from obsidiyan.corpusio import iter_docs, read_doc
 from obsidiyan.models import Sensitivity
 from obsidiyan.notewriter import remember as write_note
@@ -82,7 +83,9 @@ def _corpus_root() -> Path:
         "every term (substring, case-insensitive, any order) come first, then the best "
         "BM25 matches, marked with matched_terms below the total. Distinctive keywords "
         "work best, natural questions work too. An exact phrase in double quotes must "
-        "occur. Call get_doc for the full text."
+        "occur. ranking='hybrid' adds local embeddings for questions phrased in other "
+        "words than the source; every hit reports the ranking actually used. "
+        "Call get_doc for the full text."
     )
 )
 def search(
@@ -92,16 +95,30 @@ def search(
     source: str | None = None,
     project: str | None = None,
     include_nda: bool = False,
+    ranking: str | None = None,
 ) -> list[dict[str, Any]]:
-    hits = corpus_search(
-        query,
-        _corpus_root(),
-        limit=limit,
-        include_nda=include_nda,
-        since=date.fromisoformat(since) if since else None,
-        source=source,
-        project=project,
-    )
+    wanted = ranking or os.environ.get("OBSIDIYAN_RANKING", "fused")
+    if wanted not in ("fused", "hybrid", "substring"):
+        raise ValueError("ranking must be fused, hybrid or substring")
+    used = wanted
+    if wanted == "hybrid" and not dense.available(_corpus_root()):
+        used = "fused (no embedding index, run `obsidiyan embed`)"
+        wanted = "fused"
+    options: dict[str, Any] = {
+        "limit": limit,
+        "include_nda": include_nda,
+        "since": date.fromisoformat(since) if since else None,
+        "source": source,
+        "project": project,
+    }
+    try:
+        hits = corpus_search(query, _corpus_root(), ranking=wanted, **options)  # type: ignore[arg-type]
+    except dense.EmbeddingsUnavailable as exc:
+        used = f"fused ({exc})"
+        hits = corpus_search(query, _corpus_root(), ranking="fused", **options)
+    if not hits:
+        # Auch ohne Treffer muss der Agent sehen, ob die gewuenschte Suche lief.
+        return [{"note": "no results", "ranking": used}]
     return [
         {
             "doc_id": str(hit.path.relative_to(_corpus_root())),
@@ -113,6 +130,7 @@ def search(
             "snippet": hit.snippet,
             "score": round(hit.score, 3),
             "matched_terms": f"{hit.matched_terms}/{hit.total_terms}",
+            "ranking": used,
         }
         for hit in hits
     ]
@@ -248,7 +266,20 @@ def remember_private(
     }
 
 
+def _warm_up_embeddings() -> None:
+    """Modell vorab laden, damit die erste hybride Anfrage nicht Sekunden wartet."""
+    try:
+        if dense.available(_corpus_root()):
+            dense.encoder_for()
+    except Exception:  # Warm-up ist eine Optimierung; Fehler meldet die Suche selbst
+        return
+
+
 def main() -> None:
+    if os.environ.get("OBSIDIYAN_RANKING") == "hybrid":
+        import threading
+
+        threading.Thread(target=_warm_up_embeddings, daemon=True).start()
     server.run("stdio")
 
 
