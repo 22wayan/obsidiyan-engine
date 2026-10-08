@@ -222,6 +222,8 @@ Measured on my corpus (6,488 documents, 70,147 chunks, about four hours for the 
 
 The weight of 0.5 was fixed before the final run and not tuned afterwards. Qwen3 was chosen over IBM granite-embedding-311m-multilingual-r2 (faster, but lost a real question) on the same question sets.
 
+On real use the gain disappears. For 211 of my real prompts that needed earlier sessions, blind judges found the needed information in the BM25 results 45% of the time and in the hybrid results 42% of the time; head to head 48:40 for BM25 (p=0.46). Embeddings help when a question shares no words with the answer, which my real prompts rarely do. That is why hybrid stays opt-in and BM25 is the default.
+
 ## Command reference
 
 | Command | Purpose |
