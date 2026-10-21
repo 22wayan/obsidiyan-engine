@@ -9,6 +9,8 @@ At the end of the runbook the user has:
 - the MCP server registered in one or more agent clients,
 - optionally two Claude Code hooks: one that puts matching memories in front of a prompt, one that refreshes the vault when a session ends.
 
+Last run end to end on 2026-10-21 on macOS with Python 3.12, uv 0.12.3, Claude Code 2.1.287, codex-cli 0.163.0 and gemini-cli 0.65.0, in a fresh clone with a throwaway vault. Not covered by that run: Linux and Windows (CI runs the install, `init --demo` and the step 5 checks on Ubuntu), a model answer through Gemini CLI (only registration and connection were checked), and uv downloading a missing Python.
+
 ## Rules for the agent
 
 1. **Ask before you touch user data.** Ask the user where the vault should live and which sources to read. Ingesting Claude Code or Codex sessions copies their full text into the vault.
