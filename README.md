@@ -2,33 +2,68 @@
 
 [![ci](https://github.com/22wayan/obsidiyan-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/22wayan/obsidiyan-engine/actions/workflows/ci.yml)
 
-Shared, sourced memory for AI coding agents.
+**A local MCP server that gives Claude Code, Codex and Gemini CLI one shared memory of your past sessions and notes, with a source for every answer.**
 
-Every new session with Claude Code or Codex starts from zero. Obsidiyan turns the conversations you already had into a searchable corpus and a curated Markdown knowledge base, and gives every agent the same access through an MCP server. Statements in the knowledge base point back to the conversation they came from, and confidential material stays in a layer that is never committed.
-
-I built this for my own work and use it daily. This repository contains the engine only; my own vault stays private.
+For developers who work with AI coding agents every day and are tired of explaining the same decisions to every new session.
 
 ![Terminal demo: create a vault, search it, confidential results stay hidden](docs/demo.gif)
 
-## Try it in two minutes
+## What you get
 
-Requires Python 3.12 and [uv](https://docs.astral.sh/uv/). [ripgrep](https://github.com/BurntSushi/ripgrep) is optional but recommended: `brew install ripgrep`, `apt install ripgrep` or `winget install BurntSushi.ripgrep.MSVC`. Without it, search falls back to a pure-Python scan and returns the same results, about twice as slow on 6,500 documents (around 350 instead of 130 to 270 ms per query).
+- **Answers about earlier work, with the source.** Ask "why did we pick Postgres?" and the agent finds the session where you decided it. Every hit carries a date and a `doc_id` that opens the full conversation.
+- **One memory for all your agents.** Claude Code, Codex and Gemini CLI start the same local server. Claude Code and Codex sessions, exports from ChatGPT, Gemini and claude.ai, and your own Markdown notes end up in one searchable folder.
+- **Confidential material stays out unless asked for.** Client names, project folders, e-mail addresses and secrets mark a conversation as confidential. Search hides it unless the agent sets `include_nda`, and a check fails if anything confidential sits in the part of the vault you commit.
+- **Plain files on your machine.** The vault is a folder of Markdown. Search is BM25 over that folder, and there is no database to run. The package makes no network calls; only the optional embedding model is downloaded once.
 
-```bash
-git clone https://github.com/22wayan/obsidiyan-engine && cd obsidiyan-engine
-uv venv && uv pip install -e ".[dev]"
+**Measured:** on a fictional project history, Claude Haiku answered 0 of 54 questions about earlier decisions without memory and 49 of 54 with the obsidiyan MCP server (three runs of 18 questions, [evals/agent/results/](evals/agent/results/), details [below](#does-it-help-an-agent)).
 
-.venv/bin/python -m obsidiyan init ~/obsidiyan-demo --demo
-export OBSIDIYAN_HOME=~/obsidiyan-demo
+## Quick start
 
-.venv/bin/python -m obsidiyan search Postgres          # finds the demo decisions
-.venv/bin/python -m obsidiyan search Acme              # nothing: that session is confidential
-.venv/bin/python -m obsidiyan search Acme --include-nda
-.venv/bin/python scripts/verify-mcp.py                 # starts the MCP server and checks it end to end
-.venv/bin/python scripts/verify-nda.py                 # proves nothing confidential sits in the clean layer
-```
+You need Python 3.12 or newer, git and [uv](https://docs.astral.sh/uv/). The demo vault holds four fictional sessions; nothing of yours is read.
 
-`init --demo` creates a vault and ingests four fictional Claude Code sessions. One of them mentions a client called Acme, which is on the example deny list, so it is classified as confidential and hidden from search unless you ask for it explicitly.
+1. Get the code and install it:
+
+   ```bash
+   git clone https://github.com/22wayan/obsidiyan-engine && cd obsidiyan-engine
+   uv venv --python 3.12 && uv pip install -e ".[mcp]"
+   ```
+
+2. Create a demo vault:
+
+   ```bash
+   export OBSIDIYAN_HOME="$HOME/obsidiyan-demo"
+   .venv/bin/python -m obsidiyan init --demo
+   ```
+
+3. Search it:
+
+   ```bash
+   .venv/bin/python -m obsidiyan search Postgres            # two sessions about the shop database
+   .venv/bin/python -m obsidiyan search Acme                # "no results": that session is confidential
+   .venv/bin/python -m obsidiyan search Acme --include-nda  # now it shows, marked [NDA]
+   ```
+
+   One demo session mentions a client called Acme, which is on the example deny list, so it is classified as confidential and hidden unless you ask for it.
+
+4. Check the MCP server end to end:
+
+   ```bash
+   .venv/bin/python scripts/verify-mcp.py                   # last line: PASS: MCP server works end to end
+   ```
+
+5. Connect it to Claude Code (for this folder only) and ask a question:
+
+   ```bash
+   claude mcp add obsidiyan -e OBSIDIYAN_HOME="$OBSIDIYAN_HOME" -- "$PWD/.venv/bin/python" -m obsidiyan.mcp_server
+   claude -p "Use the obsidiyan search tool: which database did we choose for the shop backend, and why?" \
+     --allowedTools mcp__obsidiyan__search,mcp__obsidiyan__get_doc
+   ```
+
+   The answer names Postgres and gives the reasons recorded in that session.
+
+Without uv: `python3.12 -m venv .venv && .venv/bin/pip install -e ".[mcp]"`. [ripgrep](https://github.com/BurntSushi/ripgrep) is optional and makes search faster (`brew install ripgrep`, `apt install ripgrep` or `winget install BurntSushi.ripgrep.MSVC`).
+
+**Using an AI coding agent? Point it at [docs/INSTALL_FOR_AGENTS.md](docs/INSTALL_FOR_AGENTS.md).** It walks through install, vault setup, Claude Code, Codex and Gemini CLI, hooks, verification, troubleshooting and uninstall, with the expected output of every step.
 
 ## Use it with your own sessions
 
@@ -38,12 +73,32 @@ export OBSIDIYAN_HOME=~/my-vault
 
 .venv/bin/python -m obsidiyan ingest --source claude-code   # reads ~/.claude/projects
 .venv/bin/python -m obsidiyan ingest --source codex         # reads ~/.codex/sessions
+.venv/bin/python -m obsidiyan ingest --source memory        # your notes in notes/, memory/, private/
 .venv/bin/python -m obsidiyan stats
 ```
 
-Exports from ChatGPT, Gemini and claude.ai are supported as well (`--source chatgpt|gemini|claude-web`). Put them under `$OBSIDIYAN_HOME/chats/`: ChatGPT as `chats/chatgpt/conversations-*.json`, Google Takeout as `chats/gemini/*activity*.json`, claude.ai as `chats/claude/conversations.json`.
+### Add your web chats (ChatGPT, claude.ai, Gemini)
 
-Ingest is incremental: a watermark remembers what was read, so a second run only picks up new or changed sessions.
+Web chats have no API for personal accounts, so you download an export by hand and drop it into `$OBSIDIYAN_HOME/chats/`. The files stay local; `init` keeps `chats/` out of git.
+
+| Provider | How to export | Where the files go |
+|---|---|---|
+| ChatGPT | Settings, Data controls, Export data. You get an email with a download link (valid 24 hours). [OpenAI help](https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history-and-data) | Unzip; copy every `conversations-*.json` to `chats/chatgpt/` |
+| claude.ai | Settings, Privacy, Export data. The link arrives by email. [Anthropic help](https://support.claude.com/en/articles/9450526-export-your-claude-data) | Unzip; copy `conversations.json` to `chats/claude/` |
+| Gemini | [Google Takeout](https://takeout.google.com): deselect all, select "My Activity", under "All activity data included" keep only "Gemini Apps", set the format to JSON. Pick "My Activity", not "Gemini" (that one only holds Gems). Takeout can repeat the export every 2 months. [Google help](https://support.google.com/accounts/answer/3024190) | Unzip; copy `Takeout/My Activity/Gemini Apps/My Activity.json` to `chats/gemini/` and rename it to `gemini-apps-activity.json` (the reader looks for lowercase `*activity*.json`) |
+
+```bash
+mkdir -p "$OBSIDIYAN_HOME"/chats/{chatgpt,claude,gemini}
+# copy the files as in the table, then:
+.venv/bin/python -m obsidiyan ingest --source chatgpt
+.venv/bin/python -m obsidiyan ingest --source claude-web
+.venv/bin/python -m obsidiyan ingest --source gemini
+.venv/bin/python -m obsidiyan stats
+```
+
+Exports are snapshots. Repeat them every few months; ingest only adds what is new. Exports can contain private and work material, so set the confidentiality rules below before the first ingest.
+
+Ingest is incremental: a watermark remembers what was read, so a second run only picks up new or changed sessions. Set the confidentiality rules below before the first real ingest.
 
 ### Mark what is confidential
 
@@ -67,29 +122,17 @@ An override names the source and the `conv_id` from the document's frontmatter:
 
 Run the ingest again afterwards; a changed policy reclassifies every document.
 
-### Keep it up to date
+### Connect your agents
 
-`scripts/refresh.sh` copies the auto-memory, ingests every source and runs both checks. Run it by hand, from cron, or as a Claude Code hook in `~/.claude/settings.json`:
+Run these from the engine folder, so `$PWD` expands to it. The client starts the server itself, so every path must be absolute.
 
-```json
-{
-  "hooks": {
-    "SessionEnd": [
-      {"hooks": [{"type": "command",
-                  "command": "OBSIDIYAN_HOME=$HOME/my-vault bash /path/to/obsidiyan-engine/scripts/refresh.sh"}]}
-    ]
-  }
-}
-```
+| Client | Command | Tested with |
+|---|---|---|
+| Claude Code | `claude mcp add -s user obsidiyan -e OBSIDIYAN_HOME=$HOME/my-vault -- "$PWD/.venv/bin/python" -m obsidiyan.mcp_server` | 2.1.287 |
+| Codex CLI | `codex mcp add obsidiyan --env OBSIDIYAN_HOME=$HOME/my-vault -- "$PWD/.venv/bin/python" -m obsidiyan.mcp_server` | 0.163.0 |
+| Gemini CLI | `gemini mcp add -s user -e OBSIDIYAN_HOME=$HOME/my-vault obsidiyan "$PWD/.venv/bin/python" -m obsidiyan.mcp_server` | 0.65.0 |
 
-The script exits non-zero when a check fails, so a confidential document in the committed layer does not go unnoticed. Auto-memory of a project the vault has never seen goes to `private/memory/`. To let a project into the committed layer, create `memory/<project-slug>/` once; from then on its files land there unless they contain a denied name, an e-mail address or a secret.
-
-### Connect it to Claude Code
-
-```bash
-claude mcp add obsidiyan -e OBSIDIYAN_HOME=$HOME/my-vault \
-  -- "$PWD/.venv/bin/python" -m obsidiyan.mcp_server
-```
+Other MCP clients that can start a local stdio server need the same command, arguments and environment variable; they are not tested. The config file formats, approval settings and checks per client are in [docs/INSTALL_FOR_AGENTS.md](docs/INSTALL_FOR_AGENTS.md#step-6-register-the-mcp-server).
 
 The server offers five tools:
 
@@ -101,7 +144,28 @@ The server offers five tools:
 | `remember` | Write or extend a note in the committed layer (`notes/`) |
 | `remember_private` | Same for the confidential layer (`private/`) |
 
-Every MCP-capable client (Codex, Cursor, Gemini CLI) can start the same server.
+### Keep it up to date
+
+`scripts/refresh.sh` copies the auto-memory, ingests every source and runs both checks (`verify-nda.py`, `verify-graph.py`). It exits non-zero when a check fails, so a confidential document in the committed layer does not go unnoticed. Run it by hand, from cron, or as a Claude Code hook.
+
+Auto-memory of a project the vault has never seen goes to `private/memory/`. To let a project into the committed layer, create `memory/<project-slug>/` once; from then on its files land there unless they contain a denied name, an e-mail address or a secret.
+
+Two optional Claude Code hooks for `~/.claude/settings.json`: `SessionEnd` refreshes the vault after every session, `UserPromptSubmit` runs the recall hook (see [below](#recall-hook-memory-before-the-agent-answers)), which puts matching memories in front of a prompt.
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      {"hooks": [{"type": "command",
+                  "command": "OBSIDIYAN_HOME=$HOME/my-vault bash /path/to/obsidiyan-engine/scripts/refresh.sh"}]}
+    ],
+    "UserPromptSubmit": [
+      {"hooks": [{"type": "command",
+                  "command": "OBSIDIYAN_HOME=$HOME/my-vault /path/to/obsidiyan-engine/.venv/bin/python -m obsidiyan.hook"}]}
+    ]
+  }
+}
+```
 
 ## How it works
 
@@ -119,8 +183,8 @@ flowchart LR
 
 1. **Ingest.** Adapters turn session logs and provider exports into one Markdown file per conversation. User turns, assistant turns and machine-written summaries stay separate.
 2. **Classify.** A rule-based classifier marks every conversation as clean, confidential or copyrighted, based on the project and the text. Search hides confidential documents unless `include_nda` is set.
-3. **Search.** Keyword search over the corpus, no vector index. BM25 ranks every document; documents that contain all query terms come first, user statements above assistant answers and newer above older. The BM25 index is a cache under `corpus/.search-index/` and rebuilds itself when the corpus changes (about 3 s for 6,500 documents).
-4. **Distil** (optional). A daily headless Claude run picks dense conversations, extracts claims (decisions, facts, preferences, open questions) with date and source, verifies every quote against the source and opens a pull request in the vault repository. See `scripts/auto-distill.sh`; it needs the Claude Code CLI and a vault that is a git repository.
+3. **Search.** Keyword search over the corpus, no vector index. BM25 ranks every document; documents that contain all query terms come first, user statements above assistant answers and newer above older. The BM25 index is a cache under `corpus/.search-index/` and rebuilds itself when the corpus changes (about 3 s for 6,500 documents). Without ripgrep, search falls back to a pure-Python scan with the same results, about twice as slow on 6,500 documents (around 350 instead of 130 to 270 ms per query).
+4. **Distil** (optional). A daily headless Claude run picks dense conversations, extracts claims (decisions, facts, preferences, open questions) with date and source, verifies every quote against the source and opens a pull request in the vault repository. See [Distillation](#distillation).
 5. **Emit.** Claims become notes. When sources contradict each other, the newest dated user statement wins and the conflict stays visible.
 
 ## Does it help an agent?
@@ -137,20 +201,22 @@ The realistic history adds 240 sessions from three other fictional projects and 
 
 | Realistic history, 3 runs | Correct | Avg input tokens | Avg cost (USD) | Avg seconds |
 |---|---|---|---|---|
-| none | 0/54 | 3,693 | 0.0059 | 4.0 |
-| raw-logs | 53/54 | 30,256 | 0.0162 | 9.3 |
+| none (Oct 3) | 0/54 | 3,693 | 0.0059 | 4.0 |
+| raw-logs (Oct 3) | 53/54 | 30,256 | 0.0162 | 9.3 |
 | obsidiyan, substring ranking (Oct 3) | 50/54 | 20,565 | 0.0103 | 6.8 |
-| obsidiyan, BM25 ranking (Oct 7, current) | 49/54 | 18,723 | 0.0089 | 9.5 |
+| obsidiyan, BM25 ranking (Oct 7, current default) | 49/54 | 18,723 | 0.0089 | 9.5 |
 | obsidiyan, BM25 plus embeddings (Oct 7) | 48/54 | 19,547 | 0.0089 | 25.8 |
+
+Sources: `evals/agent/results/2026-10-03-realistic-haiku.md` for the Oct 3 rows, `2026-10-07-realistic-haiku-fused-run1.md` to `run3.md` and `...-hybrid-run1.md` to `run3.md` for the Oct 7 rows. `evals/agent/regrade.py evals/agent/results/*.json` recounts all of them from the stored answers with the current grading rules.
 
 On the small clean history (18 sessions, one run) both raw-logs and obsidiyan answer 17 of 18, obsidiyan with 25% fewer input tokens.
 
 What this shows, and what it does not:
 
 - Without memory the agent answers nothing. With either kind of access it answers almost everything.
-- obsidiyan reaches nearly the same accuracy with about a third fewer tokens, lower cost and shorter runs. Plain grep over raw logs is a strong baseline at this size.
+- With BM25 ranking, obsidiyan answers 49 of 54 against 53 of 54 for grep over raw logs, with 38% fewer input tokens and 45% lower cost. Run time is about the same (9.5 against 9.3 s); the substring runs took 6.8 s. Plain grep over raw logs is a strong baseline at this size.
 - With substring ranking obsidiyan missed one question in every run: asked for the *current* payment provider, it found an older decision and another project that still uses Stripe, because the session that switched to Mollie never says "provider". BM25 ranking did not fix this reliably: one of three runs names Mollie. A first count said three of three; that was a grading error, because answers like "we chose Stripe over Mollie" contain the key term. The grader now also rejects such phrases (`reject` in `questions.json`), and `evals/agent/regrade.py` re-scores stored runs. BM25 also missed q11 (passkeys) in all three runs.
-- 50, 49 and 48 of 54 for substring, BM25 and BM25 plus embeddings are within run-to-run noise: the ranking change did not measurably help or hurt the agent. Three of the embedding misses were "unknown" answers, one without any search. The embedding runs took nearly three times as long mostly because this eval starts a fresh MCP server per question, and loading the model takes about 6 s instead of 0.8 s; in normal use that happens once per session. Embeddings stay opt-in (see below).
+- 50, 49 and 48 of 54 for substring, BM25 and BM25 plus embeddings are within run-to-run noise: the ranking change did not measurably help or hurt the agent. Three of the embedding misses were "unknown" answers, one without any search. The embedding runs took nearly three times as long mostly because this eval starts a fresh MCP server per question, and loading the model takes about 6 s instead of 0.8 s; in normal use that happens once per session.
 - The eval corpus is 3.4 MB; real logs are far larger (mine: 1.4 GB), which should widen the token gap, but this eval does not prove that. 18 questions, one model, synthetic data.
 - The eval found two search bugs, both fixed: session titles were not searchable, and a query with one word too many returned nothing instead of the best partial matches.
 
@@ -197,14 +263,9 @@ BM25 runs without the recency boost, because these questions point at old sessio
 
 Agents rarely ask their memory on their own. In 1,250 of my real prompts since obsidiyan was connected, a classifier marked 60 as clearly needing earlier sessions; the agent called the MCP search in 11 of them. In about half of the rest it read vault files directly or asked another knowledge base, in the other half it did not look at all.
 
-`python -m obsidiyan.hook` is a Claude Code `UserPromptSubmit` hook. It fires on recall cues ("do you remember", "last time", "wie hatten wir", ...) or on project names taken from the vault's note file names, except the name of the current repository. It then runs the normal search, without the cue words and with the project name required, and puts the top three hits in front of the prompt. Confidential hits are only counted. It never blocks: any error ends silently.
+`python -m obsidiyan.hook` is a Claude Code `UserPromptSubmit` hook (config [above](#keep-it-up-to-date)). It fires on recall cues ("do you remember", "last time", "wie hatten wir", ...) or on project names taken from the vault's note file names, except the name of the current repository. It then runs the normal search, without the cue words and with the project name required, and puts the top three hits in front of the prompt. Confidential hits are only counted. It never blocks: any error ends silently. The context it adds is in German, and it only speaks Claude Code's hook format.
 
-```json
-"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command",
-  "command": "OBSIDIYAN_HOME=~/vault ~/obsidiyan-engine/.venv/bin/python -m obsidiyan.hook"}]}]}
-```
-
-Rules fixed before measuring, then measured once on the same 1,250 prompts: it fires on 36 of the 60 prompts that clearly needed memory (60%) and on 131 of 1,039 that did not (13%). It takes 0.05 s when it stays silent and 0.4 to 0.9 s when it searches. Whether agents answer better with it is not measured yet.
+Rules fixed before measuring, then measured once on the same 1,250 prompts: it fires on 36 of the 60 prompts that clearly needed memory (60%) and on 131 of 1,039 that did not (13%). It takes 0.05 s when it stays silent and 0.4 to 0.9 s when it searches. Whether agents answer better with it is not measured yet. Like the real-question sets above, these prompts are private and not published.
 
 ### Optional: local embeddings
 
@@ -230,11 +291,12 @@ On real use the gain disappears. For 211 of my real prompts that needed earlier 
 |---|---|
 | `init [path] [--demo]` | Create a vault; `--demo` adds four fictional sessions |
 | `ingest --source <name>` | Read one source: `claude-code`, `codex`, `chatgpt`, `gemini`, `claude-web`, `memory`, `course` |
-| `search <terms>` | Ranked: documents with every term first, then BM25; `"..."` must occur as a phrase; filters `--since`, `--source`, `--project`, `--include-nda` |
+| `search <terms>` | Ranked: documents with every term first, then BM25; `"..."` must occur as a phrase; filters `--since`, `--source`, `--project`, `--include-nda`, `--ranking` |
 | `stats` | Documents per source and per sensitivity |
+| `embed` | Build or refresh the optional embedding index (needs `.[embeddings]`) |
 | `distill`, `show`, `add-claims`, `add-reviews`, `emit`, `progress` | The distillation pipeline, see below |
 
-`python -m obsidiyan <command> --help` lists every option.
+`python -m obsidiyan <command> --help` lists every option. `python -m obsidiyan.mcp_server` starts the MCP server, `python -m obsidiyan.hook` is the recall hook.
 
 ## Distillation
 
@@ -257,7 +319,7 @@ A claim file looks like this (`kind` is one of `fakt`, `entscheidung`, `praefere
 
 Two claims with the same `key` describe the same thing; the newer one wins and the older one stays visible as superseded.
 
-`scripts/auto-distill.sh` and `scripts/daily.sh` run this unattended with the Claude Code CLI and open a pull request in the vault repository. They are my own macOS setup (launchd, `gh`, notifications); read them before you schedule them.
+`scripts/auto-distill.sh` and `scripts/daily.sh` run this unattended with the Claude Code CLI and open a pull request in the vault repository. They need a vault that is a git repository and are my own macOS setup (launchd, `gh`, notifications); read them before you schedule them.
 
 ## Vault layout
 
@@ -275,17 +337,21 @@ chats/              provider exports you put there, never committed
 
 - **`OBSIDIYAN_HOME=... is not a directory`**: run `init` first, or fix the path.
 - **`No corpus under ...`**: the vault exists but nothing was ingested yet. Run an ingest or `scripts/refresh.sh`.
+- **`no results` for everything**: `stats` shows `docs=0`, so the engine looks at the wrong folder. Set `OBSIDIYAN_HOME` to the vault, also in the MCP and hook config.
 - **Search finds nothing you know is there**: the document may be confidential. Try `--include-nda`, then check the deny lists.
 - **Search results look stale**: the BM25 cache in `corpus/.search-index/` rebuilds when files change. Deleting the folder is always safe.
 - **`ingest --source claude-code` reads 0 files**: Claude Code stores sessions under `~/.claude/projects/<slug>/`. Pass `--session-root` if yours live elsewhere.
 
+MCP server start-up, interpreter paths, permissions and client-specific problems are covered in [docs/INSTALL_FOR_AGENTS.md](docs/INSTALL_FOR_AGENTS.md#troubleshooting).
+
 ## Development
 
 ```bash
-scripts/check.sh          # ruff, mypy --strict, pytest (328 tests)
-.venv/bin/python scripts/eval-nda.py   # classifier eval
+uv pip install -e ".[dev]"
+scripts/check.sh                          # ruff, mypy --strict, pytest (328 tests)
+.venv/bin/python scripts/eval-nda.py      # classifier eval
 .venv/bin/python scripts/eval-search.py   # retrieval eval, no model needed
-vhs docs/demo.tape                     # re-record the README demo
+vhs docs/demo.tape                        # re-record the README demo
 ```
 
 `AGENTS.md` describes the code layout and the rules for changes; coding agents read it automatically.
@@ -294,9 +360,10 @@ CI runs the same checks, an end-to-end demo and a secret scan on every push.
 
 ## Status and limitations
 
+- I built this for my own work and use it daily. This repository contains the engine only; my own vault stays private.
 - A personal tool in daily use, not a maintained library. Issues are welcome, support is best effort.
-- Code comments, log output and some error messages are in German.
-- Tested on macOS with Python 3.13 and in CI on Ubuntu with Python 3.12, with Codex CLI rollouts up to version 0.160.
+- Code comments, log output, ingest statistics and some error messages are in German.
+- Tested on macOS with Python 3.12 and 3.13 and in CI on Ubuntu with Python 3.12, with Codex CLI rollouts up to version 0.160.
 
 ## License
 

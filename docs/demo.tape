@@ -19,7 +19,7 @@ Sleep 150ms
 Enter
 Sleep 1.2s
 
-Type "obsidiyan search postgres backups      # all terms must match"
+Type "obsidiyan search postgres backups      # hits with every term first"
 Sleep 150ms
 Enter
 Sleep 1.4s
