@@ -77,7 +77,26 @@ export OBSIDIYAN_HOME=~/my-vault
 .venv/bin/python -m obsidiyan stats
 ```
 
-Exports from ChatGPT, Gemini and claude.ai are supported as well (`--source chatgpt|gemini|claude-web`). Put them under `$OBSIDIYAN_HOME/chats/`: ChatGPT as `chats/chatgpt/conversations-*.json`, Google Takeout as `chats/gemini/*activity*.json`, claude.ai as `chats/claude/conversations.json`.
+### Add your web chats (ChatGPT, claude.ai, Gemini)
+
+Web chats have no API for personal accounts, so you download an export by hand and drop it into `$OBSIDIYAN_HOME/chats/`. The files stay local; `init` keeps `chats/` out of git.
+
+| Provider | How to export | Where the files go |
+|---|---|---|
+| ChatGPT | Settings, Data controls, Export data. You get an email with a download link (valid 24 hours). [OpenAI help](https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history-and-data) | Unzip; copy every `conversations-*.json` to `chats/chatgpt/` |
+| claude.ai | Settings, Privacy, Export data. The link arrives by email. [Anthropic help](https://support.claude.com/en/articles/9450526-export-your-claude-data) | Unzip; copy `conversations.json` to `chats/claude/` |
+| Gemini | [Google Takeout](https://takeout.google.com): deselect all, select "My Activity", under "All activity data included" keep only "Gemini Apps", set the format to JSON. Pick "My Activity", not "Gemini" (that one only holds Gems). Takeout can repeat the export every 2 months. [Google help](https://support.google.com/accounts/answer/3024190) | Unzip; copy `Takeout/My Activity/Gemini Apps/My Activity.json` to `chats/gemini/` and rename it to `gemini-apps-activity.json` (the reader looks for lowercase `*activity*.json`) |
+
+```bash
+mkdir -p "$OBSIDIYAN_HOME"/chats/{chatgpt,claude,gemini}
+# copy the files as in the table, then:
+.venv/bin/python -m obsidiyan ingest --source chatgpt
+.venv/bin/python -m obsidiyan ingest --source claude-web
+.venv/bin/python -m obsidiyan ingest --source gemini
+.venv/bin/python -m obsidiyan stats
+```
+
+Exports are snapshots. Repeat them every few months; ingest only adds what is new. Exports can contain private and work material, so set the confidentiality rules below before the first ingest.
 
 Ingest is incremental: a watermark remembers what was read, so a second run only picks up new or changed sessions. Set the confidentiality rules below before the first real ingest.
 

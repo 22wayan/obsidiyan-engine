@@ -171,7 +171,7 @@ cd "$ENGINE_DIR"
 "$PY" -m obsidiyan stats
 ```
 
-Other sources: `chatgpt`, `gemini` and `claude-web` read exports the user placed under `$OBSIDIYAN_HOME/chats/` (`chats/chatgpt/conversations-*.json`, `chats/gemini/*activity*.json`, `chats/claude/conversations.json`); `course` reads course transcripts. Add `--dry-run` to count without writing, `--session-root <dir>` to read sessions from another folder.
+Other sources: `chatgpt`, `gemini` and `claude-web` read exports the user placed under `$OBSIDIYAN_HOME/chats/` (`chats/chatgpt/conversations-*.json`, `chats/gemini/*activity*.json`, `chats/claude/conversations.json`; how the user gets these exports and the Gemini rename step are in the README section "Add your web chats"); `course` reads course transcripts. Do not request exports on the user's behalf; ask them to download and place the files. Add `--dry-run` to count without writing, `--session-root <dir>` to read sessions from another folder.
 
 Expected: one line per ingest. The labels are German: `dateien` is files seen, `unveraendert` unchanged, `docs` documents written.
 
