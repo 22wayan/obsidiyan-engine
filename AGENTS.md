@@ -2,6 +2,8 @@
 
 Guide for coding agents working on this repository. Users of the engine find everything in `README.md`.
 
+To install obsidiyan for a user (vault, MCP registration for Claude Code, Codex and Gemini CLI, hooks, verification), follow `docs/INSTALL_FOR_AGENTS.md` instead of this file.
+
 ## What this is
 
 A Python package (`obsidiyan`) that turns AI coding sessions and chat exports into a searchable Markdown corpus, distils them into sourced notes and serves both over MCP. The engine is code only. All data lives in a separate vault directory named by `OBSIDIYAN_HOME`.
@@ -31,11 +33,14 @@ Never point `OBSIDIYAN_HOME` at a real vault while testing.
 | `obsidiyan/sources/` | One adapter per source (Claude Code, Codex, provider archives, notes, courses) |
 | `obsidiyan/ingest.py` | Runs an adapter, classifies, writes corpus documents, keeps the watermark |
 | `obsidiyan/nda.py` | The only place that decides clean versus confidential |
-| `obsidiyan/search.py` | Plain-text ranking, no index |
+| `obsidiyan/search.py` | Ranking: exact term matches fused with BM25, optional hybrid mode |
+| `obsidiyan/bm25.py` | BM25 index, a cache under `corpus/.search-index/` that rebuilds when the corpus changes |
+| `obsidiyan/dense.py` | Optional local embeddings for `ranking="hybrid"` (extra `embeddings`) |
 | `obsidiyan/notewriter.py` | `remember` and `remember_private`, with all write guards |
 | `obsidiyan/distill/` | Candidate selection, claim store, routing, note emission |
 | `obsidiyan/graph.py` | Note graph invariants used by `scripts/verify-graph.py` |
 | `obsidiyan/mcp_server.py` | MCP tools: search, get_doc, timeline, remember, remember_private |
+| `obsidiyan/hook.py` | Claude Code `UserPromptSubmit` recall hook; never blocks a prompt |
 | `obsidiyan/vault_init.py` | `init` and the bundled demo sessions in `obsidiyan/demo/` |
 | `scripts/` | Refresh, verification and the optional unattended distillation |
 | `tests/` | pytest; tests write vault data only under `tmp_path` |
