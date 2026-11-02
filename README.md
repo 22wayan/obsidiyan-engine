@@ -6,7 +6,7 @@
 
 For developers who work with AI coding agents every day and are tired of explaining the same decisions to every new session.
 
-![Terminal demo: create a vault, search it, confidential results stay hidden](docs/demo.gif)
+https://github.com/user-attachments/assets/938ac8a8-1016-445c-b229-42c9f2f1bbba
 
 ## What you get
 
@@ -351,7 +351,6 @@ uv pip install -e ".[dev]"
 scripts/check.sh                          # ruff, mypy --strict, pytest (328 tests)
 .venv/bin/python scripts/eval-nda.py      # classifier eval
 .venv/bin/python scripts/eval-search.py   # retrieval eval, no model needed
-vhs docs/demo.tape                        # re-record the README demo
 ```
 
 `AGENTS.md` describes the code layout and the rules for changes; coding agents read it automatically.
@@ -368,3 +367,5 @@ CI runs the same checks, an end-to-end demo and a secret scan on every push.
 ## License
 
 MIT
+
+The film at the top of this README sits outside the MIT license. Its music ("New Bass 01" by Lily J) and sound effects come from Mixkit under the Mixkit free licenses, the fonts (Bricolage Grotesque, JetBrains Mono) under the SIL Open Font License.
